@@ -1,0 +1,301 @@
+---
+import { sanityClient } from "../lib/sanity";
+
+type ProjectImage = {
+  url?: string;
+  alt?: string;
+  titulo?: {
+    es?: string;
+    en?: string;
+  };
+  slug?: { current?: string };
+};
+
+type ProjectRaw = {
+  titulo?: {
+    es?: string;
+    en?: string;
+  };
+  slug?: { current?: string };
+  imagencover?: {
+    alt?: string;
+    asset?: {
+      url?: string;
+    };
+  };
+};
+
+const proyects = await sanityClient.fetch<ProjectRaw[]>(`
+*[_type == "proyecto"][0..10]{
+  titulo{
+    es,
+    en
+  },
+  slug,
+  imagencover{
+    alt,
+    asset->{
+      url
+    }
+  },
+}
+`);
+
+const projectImages: ProjectImage[] = proyects
+  .map((project) => ({
+    url: project?.imagencover?.asset?.url,
+    alt: project?.imagencover?.alt,
+    titulo: project?.titulo,
+    slug: project?.slug,
+  }))
+  .filter((image: ProjectImage) => Boolean(image.url));
+
+const sliderItems = projectImages.map((item) => ({
+  url: item.url ?? "",
+  alt: item.alt ?? item.titulo?.es ?? "Proyecto",
+  titulo: item.titulo?.es ?? "Proyecto",
+  href: item.slug?.current ? `/proyecto/${item.slug.current}` : "#",
+}));
+---
+
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/keen-slider@6.8.6/keen-slider.min.css"
+/>
+
+<div
+  style="margin: 0 auto; width: 100%; max-width: 1800px;"
+  class="px-6 sm:px-12 lg:px-24"
+>
+  <section class="w-full py-20 flex flex-col gap-16">
+    <!-- Header -->
+
+    <!-- Carousels -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div>
+        <h2
+          class="text-white font-['Instrument_Serif'] text-3xl md:text-4xl leading-tight mb-12"
+        >
+          Ilustraciones
+        </h2>
+        <article
+          class="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6"
+        >
+          <div class="mb-4 flex items-center justify-end gap-2.5">
+            <button
+              id="arrow-left-1"
+              aria-label="Anterior"
+              class="arrow text-white border border-white/20 rounded-full w-10 h-10 flex items-center justify-center"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><polyline points="15 18 9 12 15 6"></polyline></svg
+              >
+            </button>
+            <button
+              id="arrow-right-1"
+              aria-label="Siguiente"
+              class="arrow text-white border border-white/20 rounded-full w-10 h-10 flex items-center justify-center"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><polyline points="9 18 15 12 9 6"></polyline></svg
+              >
+            </button>
+          </div>
+
+          <div class="overflow-hidden mx-auto">
+            <div
+              id="keen-slider-1"
+              class="keen-slider min-h-45 flex items-center"
+            >
+              <!-- Slides inyectados por JS -->
+            </div>
+          </div>
+        </article>
+      </div>
+      <div>
+        <h2
+          class="text-white font-['Instrument_Serif'] text-3xl md:text-4xl leading-tight mb-12"
+        >
+          Fotografías
+        </h2>
+        <article
+          class="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-6"
+        >
+          <div class="mb-4 flex items-center justify-end gap-2.5">
+            <button
+              id="arrow-left-2"
+              aria-label="Anterior"
+              class="arrow text-white border border-white/20 rounded-full w-10 h-10 flex items-center justify-center"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><polyline points="15 18 9 12 15 6"></polyline></svg
+              >
+            </button>
+            <button
+              id="arrow-right-2"
+              aria-label="Siguiente"
+              class="arrow text-white border border-white/20 rounded-full w-10 h-10 flex items-center justify-center"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><polyline points="9 18 15 12 9 6"></polyline></svg
+              >
+            </button>
+          </div>
+
+          <div class="overflow-hidden mx-auto">
+            <div
+              id="keen-slider-2"
+              class="keen-slider min-h-45 flex items-center"
+            >
+              <!-- Slides inyectados por JS -->
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script type="module" define:vars={{ sliderItems }}>
+  import KeenSlider from "https://cdn.jsdelivr.net/npm/keen-slider@6.8.6/+esm";
+
+  const slidesData = Array.isArray(sliderItems) ? sliderItems : [];
+
+  const createSlides = (items) =>
+    items
+      .map(
+        (item) => `
+      <div class="keen-slider__slide h-full px-2 sm:px-3 overflow-visible">
+        <a
+          href="${item.href || "#"}"
+         
+          class="min-h-full overflow-hidden group block  rounded-xl border border-white/10 bg-black/20"
+        >
+          <img
+            src="${item.url}"
+            alt="${item.alt}"
+            class="w-fit h-fit object-cover overflow-visible transition-transform duration-300 group-hover:scale-[1.03]"
+            loading="lazy"
+          />
+          <div class="border-t border-white/10 px-3 py-2 text-sm text-white/80">
+            ${item.titulo}
+          </div>
+        </a>
+      </div>
+    `,
+      )
+      .join("");
+
+  const autoLoop =
+    (delay = 2000) =>
+    (slider) => {
+      let timeout;
+      let mouseOver = false;
+
+      const clearNextTimeout = () => {
+        clearTimeout(timeout);
+      };
+
+      const nextTimeout = () => {
+        clearTimeout(timeout);
+        if (mouseOver) return;
+        timeout = setTimeout(() => {
+          slider.next();
+        }, delay);
+      };
+
+      slider.on("created", () => {
+        slider.container.addEventListener("mouseover", () => {
+          mouseOver = true;
+          clearNextTimeout();
+        });
+        slider.container.addEventListener("mouseout", () => {
+          mouseOver = false;
+          nextTimeout();
+        });
+        nextTimeout();
+      });
+
+      slider.on("dragStarted", clearNextTimeout);
+      slider.on("animationEnded", nextTimeout);
+      slider.on("updated", nextTimeout);
+    };
+
+  const initCarousel = (sliderId, leftArrowId, rightArrowId) => {
+    const sliderElement = document.getElementById(sliderId);
+    const arrowLeft = document.getElementById(leftArrowId);
+    const arrowRight = document.getElementById(rightArrowId);
+
+    if (!sliderElement || slidesData.length === 0) return;
+
+    sliderElement.innerHTML = createSlides(slidesData);
+
+    const slider = new KeenSlider(
+      sliderElement,
+      {
+        loop: true,
+        drag: true,
+        slides: {
+          perView: 1.2,
+          spacing: 12,
+        },
+        breakpoints: {
+          "(min-width: 768px)": {
+            slides: { perView: 1.6, spacing: 14 },
+          },
+          "(min-width: 1200px)": {
+            slides: { perView: 2, spacing: 16 },
+          },
+        },
+      },
+      [autoLoop(2000)],
+    );
+
+    if (arrowLeft) {
+      arrowLeft.addEventListener("click", () => slider.prev());
+    }
+
+    if (arrowRight) {
+      arrowRight.addEventListener("click", () => slider.next());
+    }
+  };
+
+  initCarousel("keen-slider-1", "arrow-left-1", "arrow-right-1");
+  initCarousel("keen-slider-2", "arrow-left-2", "arrow-right-2");
+</script>
