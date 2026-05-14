@@ -1,54 +1,118 @@
 import {defineField, defineType} from 'sanity'
 
+// Helper para campos traducibles
+const localizedString = (name: string, title: string) =>
+  defineField({
+    name,
+    title,
+    type: 'object',
+    fields: [
+      defineField({
+        name: 'es',
+        title: 'Español',
+        type: 'string',
+        validation: (rule) => rule.required(),
+      }),
+      defineField({
+        name: 'en',
+        title: 'English',
+        type: 'string',
+        validation: (rule) => rule.required(),
+      }),
+    ],
+  })
+
+const localizedText = (name: string, title: string) =>
+  defineField({
+    name,
+    title,
+    type: 'object',
+    fields: [
+      defineField({
+        name: 'es',
+        title: 'Español',
+        type: 'text',
+        validation: (rule) => rule.required(),
+      }),
+      defineField({
+        name: 'en',
+        title: 'English',
+        type: 'text',
+        validation: (rule) => rule.required(),
+      }),
+    ],
+  })
+
 export const proyectoType = defineType({
   name: 'proyecto',
   title: 'Proyecto',
   type: 'document',
+  preview: {
+    select: {
+      title: 'titulo.es', // Mostrar el título en español
+      media: 'imagencover', // Mostrar la imagen de portada
+    },
+    prepare({title, media}) {
+      return {
+        title: title || 'Sin título',
+        media,
+      }
+    },
+  },
   fields: [
-    defineField({
-      name: 'titulo',
-      title: 'Título',
-      type: 'string',
-      validation: (rule) => rule.required(),
-    }),
+    // Título traducible
+    localizedString('titulo', 'Título'),
+
     defineField({
       name: 'slug',
       title: 'Slug',
       type: 'slug',
       options: {
-        source: 'titulo',
+        // El slug se genera a partir del título en español
+        source: (doc) => (doc.titulo as {es?: string} | undefined)?.es || '',
         slugify: (input) => input.toLowerCase().replace(/\s+/g, '-').slice(0, 200),
       },
       validation: (rule) => rule.required(),
     }),
+
+    // Descripción corta traducible
+    localizedText('descripcioncorta', 'Descripción corta'),
+
     defineField({
-      name: 'descripcioncorta',
-      title: 'Descripción corta',
-      type: 'text',
-      validation: (rule) => rule.required(),
+      name: 'imagencover',
+      title: 'Imagen de portada',
+      type: 'image',
+      options: {
+        hotspot: true,
+      },
     }),
-    defineField({
-  name: 'imagencover',
-  title: 'Imagen de portada',
-  type: 'image',
-  options: {
-    hotspot: true,
-  },
-}),
+
+    // Tags traducibles
     defineField({
       name: 'tags',
       title: 'Tags',
       type: 'array',
-      of: [{type: 'string'}],
+      of: [
+        {
+          type: 'reference',
+          to: [{type: 'tag'}],
+          options: {
+            filter: '!(_id in path("drafts.**"))',
+          },
+        },
+      ],
       options: {layout: 'tags'},
-      validation: (rule) => rule.required(),
+      validation: (rule) => rule.required().min(1).unique(),
     }),
+
     defineField({
       name: 'anio',
       title: 'Año',
       type: 'number',
       validation: (rule) => rule.required(),
     }),
+
+    // Labels de links traducibles
     defineField({
       name: 'links',
       title: 'Links',
@@ -57,44 +121,71 @@ export const proyectoType = defineType({
         {
           type: 'object',
           fields: [
-            {name: 'label', title: 'Texto', type: 'string'},
+            defineField({
+              name: 'label',
+              title: 'Texto',
+              type: 'object',
+              fields: [
+                {name: 'es', title: 'Español', type: 'string'},
+                {name: 'en', title: 'English', type: 'string'},
+              ],
+            }),
             {name: 'url', title: 'URL', type: 'url'},
           ],
         },
       ],
     }),
+
+    defineField({
+      name: 'youtubeLinks',
+      title: 'Enlaces de YouTube',
+      description: 'Opcional: puedes añadir 0, 1 o varios enlaces de YouTube.',
+      type: 'array',
+      of: [
+        defineField({
+          name: 'url',
+          title: 'URL de YouTube',
+          type: 'url',
+          validation: (rule) =>
+            rule.uri({scheme: ['http', 'https']}).custom((value) => {
+              if (!value) {
+                return true
+              }
+
+              return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(value)
+                ? true
+                : 'Solo se permiten enlaces de YouTube (youtube.com o youtu.be).'
+            }),
+        }),
+      ],
+      validation: (rule) => rule.unique(),
+    }),
+
+    // INTRODUCCIÓN
     defineField({
       name: 'introduccion',
       title: 'Introducción',
       type: 'object',
-      validation: (rule) => rule.required(), 
+      validation: (rule) => rule.required(),
       fields: [
         defineField({
           name: 'imagenes',
           title: 'Imágenes',
           type: 'array',
           of: [{type: 'image'}],
-          validation: (rule) => rule.min(1).error('Añade al menos una imagen'),
+          validation: (rule) => rule.min(1),
         }),
-        defineField({
-          name: 'texto',
-          title: 'Texto',
-          type: 'text',
-          validation: (rule) => rule.required(),
-        }),
+        localizedText('texto', 'Texto'),
       ],
     }),
 
+    // TÉCNICAS
     defineField({
       name: 'tecnicas',
       title: 'Técnicas',
       type: 'object',
       fields: [
-        defineField({
-          name: 'texto',
-          title: 'Texto',
-          type: 'text',
-        }),
+        localizedText('texto', 'Texto'),
         defineField({
           name: 'imagenes',
           title: 'Imágenes',
@@ -105,21 +196,28 @@ export const proyectoType = defineType({
           name: 'tags',
           title: 'Tags',
           type: 'array',
-          of: [{type: 'string'}],
+          of: [
+            {
+              type: 'reference',
+              to: [{type: 'tag'}],
+              options: {
+                filter: '!(_id in path("drafts.**"))',
+              },
+            },
+          ],
           options: {layout: 'tags'},
+          validation: (rule) => rule.unique(),
         }),
       ],
     }),
+
+    // MENSAJE
     defineField({
       name: 'mensaje',
       title: 'Mensaje',
       type: 'object',
       fields: [
-        defineField({
-          name: 'texto',
-          title: 'Texto',
-          type: 'text',
-        }),
+        localizedText('texto', 'Texto'),
         defineField({
           name: 'imagenes',
           title: 'Imágenes',
@@ -128,16 +226,14 @@ export const proyectoType = defineType({
         }),
       ],
     }),
+
+    // INSPIRACIÓN
     defineField({
       name: 'inspiracion',
       title: 'Inspiración',
       type: 'object',
       fields: [
-        defineField({
-          name: 'texto',
-          title: 'Texto',
-          type: 'text',
-        }),
+        localizedText('texto', 'Texto'),
         defineField({
           name: 'imagenes',
           title: 'Imágenes',
@@ -146,16 +242,14 @@ export const proyectoType = defineType({
         }),
       ],
     }),
+
+    // INTENCIÓN
     defineField({
       name: 'intencion',
       title: 'Intención',
       type: 'object',
       fields: [
-        defineField({
-          name: 'texto',
-          title: 'Texto',
-          type: 'text',
-        }),
+        localizedText('texto', 'Texto'),
         defineField({
           name: 'imagenes',
           title: 'Imágenes',
@@ -164,10 +258,8 @@ export const proyectoType = defineType({
         }),
       ],
     }),
-    defineField({
-      name: 'informacionRecalcable',
-      title: 'Información Recalcable',
-      type: 'text',
-    }),
+
+    // Texto final traducible
+    localizedText('informacionRecalcable', 'Información Recalcable'),
   ],
 })

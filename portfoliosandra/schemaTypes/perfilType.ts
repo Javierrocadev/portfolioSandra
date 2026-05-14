@@ -20,28 +20,91 @@ export const perfilType = defineType({
       },
     }),
     defineField({
+      name: 'cvEn',
+      title: 'Currículum (CV) English',
+      type: 'file',
+      options: {
+        accept: '.pdf',
+      },
+    }),
+    defineField({
       name: 'descripcioncorta',
       title: 'Descripción Corta',
-      type: 'string',
-      validation: (rule) => rule.required(),
+      type: 'object',
+      fields: [
+        {
+          name: 'es',
+          title: 'Español',
+          type: 'string',
+          validation: (rule) => rule.required(),
+        },
+        {
+          name: 'en',
+          title: 'English',
+          type: 'string',
+          validation: (rule) => rule.required(),
+        },
+      ],
     }),
     defineField({
       name: 'ocupacion',
       title: 'Ocupación',
-      type: 'string',
-      validation: (rule) => rule.required(),
+      type: 'object',
+      fields: [
+        {
+          name: 'es',
+          title: 'Español',
+          type: 'string',
+          validation: (rule) => rule.required(),
+        },
+        {
+          name: 'en',
+          title: 'English',
+          type: 'string',
+          validation: (rule) => rule.required(),
+        },
+      ],
     }),
     defineField({
       name: 'descripcion',
-      title: 'Esto es el sobre mí',
-      type: 'text',
-      validation: (rule) => rule.required(),
+      title: 'Sobre mí',
+      type: 'object',
+      fields: [
+        {
+          name: 'es',
+          title: 'Español',
+          type: 'text',
+          validation: (rule) => rule.required(),
+        },
+        {
+          name: 'en',
+          title: 'English',
+          type: 'text',
+          validation: (rule) => rule.required(),
+        },
+      ],
     }),
     defineField({
       name: 'tags',
       title: 'Skills / Tags',
       type: 'array',
-      of: [{type: 'string'}],
+      of: [
+        {
+          type: 'object',
+          fields: [
+            {
+              name: 'es',
+              title: 'Español',
+              type: 'string',
+            },
+            {
+              name: 'en',
+              title: 'English',
+              type: 'string',
+            },
+          ],
+        },
+      ],
       options: {layout: 'tags'},
     }),
     defineField({
