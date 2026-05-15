@@ -195,6 +195,8 @@ const sliderItems = projectImages.map((item) => ({
 <script type="module" define:vars={{ sliderItems }}>
   import KeenSlider from "https://cdn.jsdelivr.net/npm/keen-slider@6.8.6/+esm";
 
+  const carouselWindow = window;
+
   const slidesData = Array.isArray(sliderItems) ? sliderItems : [];
 
   const createSlides = (items) =>
@@ -262,7 +264,7 @@ const sliderItems = projectImages.map((item) => ({
     const arrowLeft = document.getElementById(leftArrowId);
     const arrowRight = document.getElementById(rightArrowId);
 
-    if (!sliderElement || slidesData.length === 0) return;
+    if (!sliderElement || slidesData.length === 0) return null;
 
     sliderElement.innerHTML = createSlides(slidesData);
 
@@ -287,15 +289,42 @@ const sliderItems = projectImages.map((item) => ({
       [autoLoop(2000)],
     );
 
+    const onPrev = () => slider.prev();
+    const onNext = () => slider.next();
+
     if (arrowLeft) {
-      arrowLeft.addEventListener("click", () => slider.prev());
+      arrowLeft.addEventListener("click", onPrev);
     }
 
     if (arrowRight) {
-      arrowRight.addEventListener("click", () => slider.next());
+      arrowRight.addEventListener("click", onNext);
     }
+
+    return () => {
+      arrowLeft?.removeEventListener("click", onPrev);
+      arrowRight?.removeEventListener("click", onNext);
+      slider.destroy();
+      sliderElement.innerHTML = "";
+    };
   };
 
-  initCarousel("keen-slider-1", "arrow-left-1", "arrow-right-1");
-  initCarousel("keen-slider-2", "arrow-left-2", "arrow-right-2");
+  const initCarousels = () => {
+    if (typeof carouselWindow.__carouselCleanup === "function") {
+      carouselWindow.__carouselCleanup();
+    }
+
+    const cleanups = [
+      initCarousel("keen-slider-1", "arrow-left-1", "arrow-right-1"),
+      initCarousel("keen-slider-2", "arrow-left-2", "arrow-right-2"),
+    ].filter((cleanup) => typeof cleanup === "function");
+
+    carouselWindow.__carouselCleanup = () => {
+      cleanups.forEach((cleanup) => {
+        if (typeof cleanup === "function") cleanup();
+      });
+    };
+  };
+
+  document.addEventListener("astro:page-load", initCarousels);
+  initCarousels();
 </script>
