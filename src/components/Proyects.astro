@@ -1,5 +1,6 @@
 ---
 import { sanityClient } from "../lib/sanity";
+import { DEFAULT_LANG, LANG_STORAGE_KEY, translations } from "../i18n/translations";
 
 type ProjectImage = {
   url?: string;
@@ -67,6 +68,9 @@ const grid2Slots = [
 
 const getProjectHref = (slug?: { current?: string }) =>
   slug?.current ? `/proyecto/${slug.current}` : "#";
+
+const defaultLang = DEFAULT_LANG;
+const projectsDictionary = translations;
 ---
 
 <div
@@ -77,14 +81,16 @@ const getProjectHref = (slug?: { current?: string }) =>
     <!-- Header -->
     <div class="flex flex-col gap-4">
       <span
+        data-i18n-proyects="selectedWorks"
         class="w-fit bg-white/5 border border-white/10 rounded-full px-4 py-1 text-white/60 text-xs uppercase tracking-[3.6px]"
       >
-        Selected Works
+        {projectsDictionary[defaultLang].general.selectedWorks}
       </span>
       <h2
+        data-i18n-proyects="featuredProjects"
         class="text-white font-['Instrument_Serif'] text-6xl md:text-8xl leading-tight"
       >
-        Featured <span class="">Projects</span>
+        {projectsDictionary[defaultLang].general.featuredProjects}
       </h2>
     </div>
 
@@ -257,3 +263,43 @@ const getProjectHref = (slug?: { current?: string }) =>
     </div>
   </section>
 </div>
+
+<script>
+  import { LANG_STORAGE_KEY, translations } from "../i18n/translations";
+
+  const PROYECTS_I18N = {
+    es: translations.es.general,
+    en: translations.en.general,
+  };
+
+  function initProyectsLanguage() {
+    const i18nNodes = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-i18n-proyects]"),
+    );
+
+    function sanitizeLang(value: string | null): "es" | "en" {
+      return value === "en" ? "en" : "es";
+    }
+
+    function applyProyectsLanguage(lang: "es" | "en") {
+      const dictionary = PROYECTS_I18N[lang];
+
+      i18nNodes.forEach((node) => {
+        const key = node.dataset.i18nProyects as keyof typeof dictionary | undefined;
+        if (!key) return;
+        node.textContent = dictionary[key];
+      });
+    }
+
+    const initialLang = sanitizeLang(localStorage.getItem(LANG_STORAGE_KEY));
+    applyProyectsLanguage(initialLang);
+
+    window.addEventListener("site-language-change", (event) => {
+      const customEvent = event as CustomEvent<{ lang?: string }>;
+      applyProyectsLanguage(sanitizeLang(customEvent.detail?.lang ?? null));
+    });
+  }
+
+  document.addEventListener("astro:page-load", initProyectsLanguage);
+  initProyectsLanguage();
+</script>
