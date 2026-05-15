@@ -239,7 +239,10 @@ const projectsDictionary = translations;
                 //     </svg>
                 //   </a>
                 // </div>
-                <div class="cursor-pointer group overflow-hidden duration-1000 hover:duration-300 relative w-full h-80 rounded-2xl ">
+                <a
+                  href="/myproyects"
+                  class="cursor-pointer group overflow-hidden duration-1000 hover:duration-300 relative w-full h-80 rounded-2xl block"
+                >
                   <div class="bg-transparent group-hover:scale-150 -top-12 -right-12 absolute shadow-white/10 shadow-inner rounded-full transition-all ease-in-out group-hover:duration-1000 duration-1000 w-24 h-24" />
                   <div class="bg-transparent group-hover:scale-150 top-44 right-14 absolute shadow-white/20 shadow-inner rounded-full transition-all ease-in-out group-hover:duration-1000 duration-1000 w-24 h-24" />
                   <div class="bg-transparent group-hover:scale-150 top-24 right-56 absolute shadow-white/10 shadow-inner rounded-full transition-all ease-in-out group-hover:duration-1000 duration-1000 w-24 h-24" />
@@ -254,9 +257,8 @@ const projectsDictionary = translations;
                     >
                       {projectsDictionary[defaultLang].general.exploreMore}
                     </h3>
-                    <a
-                      href="/myproyects"
-                      class="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-neutral-100 text-black font-manrope font-semibold text-sm transition-all duration-300 hover:bg-white hover:-translate-y-px w-fit"
+                    <span
+                      class="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-neutral-100 text-black font-manrope font-semibold text-sm transition-all duration-300 group-hover:bg-white group-hover:-translate-y-px w-fit"
                     >
                       Ver todos
                       <svg
@@ -271,9 +273,9 @@ const projectsDictionary = translations;
                           clip-rule="evenodd"
                         />
                       </svg>
-                    </a>
+                    </span>
                   </div>
-                </div>
+                </a>
               )}
               {slot.image?.url && (
                 <a
