@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 import { sanityClient } from '../../lib/sanity'
 import Footer from '../../components/Footer.astro';
+import { DEFAULT_LANG, LANG_STORAGE_KEY } from '../../i18n/translations';
 
 type SanityImage = {
   asset?: {
@@ -10,31 +11,76 @@ type SanityImage = {
   }
 }
 
-type ContentBlock = {
-  texto?: string
+type LocalizedText = {
+  es?: string
+  en?: string
+}
+
+type SanityTag = {
+  label?: LocalizedText
+}
+
+type LocalizedContentBlock = {
+  texto?: LocalizedText
   imagenes?: SanityImage[]
 }
 
-type TecnicasBlock = ContentBlock & {
-  tags?: string[]
+type LocalizedTecnicasBlock = LocalizedContentBlock & {
+  tags?: (SanityTag | null)[]
 }
 
-type Project = {
-  titulo?: string
+type ProjectRaw = {
+  titulo?: LocalizedText
   slug?: {
     current?: string
   }
-  descripcioncorta?: string
+  descripcioncorta?: LocalizedText
+  anio?: number
+  tags?: (SanityTag | null)[]
+  imagencover?: SanityImage
+  links?: ({ label?: LocalizedText; url?: string } | null)[]
+  introduccion?: LocalizedContentBlock
+  tecnicas?: LocalizedTecnicasBlock
+  mensaje?: LocalizedContentBlock
+  inspiracion?: LocalizedContentBlock
+  intencion?: LocalizedContentBlock
+  informacionRecalcable?: LocalizedText
+}
+
+type ProjectContentBlock = {
+  texto?: string
+  textoEs?: string
+  textoEn?: string
+  imagenes?: SanityImage[]
+}
+
+type ProjectTecnicasBlock = ProjectContentBlock & {
+  tags?: string[]
+  tagsEs?: string[]
+  tagsEn?: string[]
+}
+
+type ProjectMapped = {
+  titulo?: string
+  tituloEs?: string
+  tituloEn?: string
+  slug?: {
+    current?: string
+  }
   anio?: number
   tags?: string[]
+  tagsEs?: string[]
+  tagsEn?: string[]
   imagencover?: SanityImage
-  links?: { label?: string; url?: string }[]
-  introduccion?: ContentBlock
-  tecnicas?: TecnicasBlock
-  mensaje?: ContentBlock
-  inspiracion?: ContentBlock
-  intencion?: ContentBlock
+  links?: { label?: string; labelEs?: string; labelEn?: string; url?: string }[]
+  introduccion?: ProjectContentBlock
+  tecnicas?: ProjectTecnicasBlock
+  mensaje?: ProjectContentBlock
+  inspiracion?: ProjectContentBlock
+  intencion?: ProjectContentBlock
   informacionRecalcable?: string
+  informacionRecalcableEs?: string
+  informacionRecalcableEn?: string
 }
 
 export async function getStaticPaths() {
@@ -61,13 +107,52 @@ export async function getStaticPaths() {
 
 const { slug } = Astro.params
 
-const project = await sanityClient.fetch<Project | null>(
+const defaultLang = DEFAULT_LANG;
+
+const pickLocalized = (value: LocalizedText | undefined, lang: 'es' | 'en') => {
+  if (!value) return '';
+  return lang === 'en' ? value.en ?? value.es ?? '' : value.es ?? value.en ?? '';
+}
+
+const mapLocalizedBlock = (block: LocalizedContentBlock | undefined): ProjectContentBlock | undefined => {
+  if (!block) return undefined;
+  return {
+    texto: pickLocalized(block.texto, defaultLang),
+    textoEs: pickLocalized(block.texto, 'es'),
+    textoEn: pickLocalized(block.texto, 'en'),
+    imagenes: block.imagenes,
+  };
+}
+
+const getLocalizedTags = (tags: (SanityTag | null)[] | undefined, lang: 'es' | 'en') =>
+  (tags ?? [])
+    .map((tag) => {
+      if (!tag?.label) return '';
+      return lang === 'en'
+        ? tag.label.en ?? tag.label.es ?? ''
+        : tag.label.es ?? tag.label.en ?? '';
+    })
+    .filter(Boolean)
+
+const mapLocalizedLinks = (links: ({ label?: LocalizedText; url?: string } | null)[] | undefined) =>
+  (links ?? [])
+    .filter((link): link is { label?: LocalizedText; url?: string } => Boolean(link?.url))
+    .map((link) => ({
+      label: pickLocalized(link.label, defaultLang),
+      labelEs: pickLocalized(link.label, 'es') || 'Ver enlace',
+      labelEn: pickLocalized(link.label, 'en') || 'View link',
+      url: link.url,
+    }))
+
+const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
   `*[_type == "proyecto" && slug.current == $slug][0]{
-    titulo,
+    titulo{es,en},
     slug,
-    descripcioncorta,
+    descripcioncorta{es,en},
     anio,
-    tags,
+    tags[]->{
+      label{es,en}
+    },
 
     imagencover{
       ...,
@@ -75,12 +160,12 @@ const project = await sanityClient.fetch<Project | null>(
     },
 
     links[]{
-      label,
+      label{es,en},
       url
     },
 
     introduccion{
-      texto,
+      texto{es,en},
       imagenes[]{
         ...,
         asset->
@@ -88,8 +173,10 @@ const project = await sanityClient.fetch<Project | null>(
     },
 
     tecnicas{
-      texto,
-      tags,
+      texto{es,en},
+      tags[]->{
+        label{es,en}
+      },
       imagenes[]{
         ...,
         asset->
@@ -97,7 +184,7 @@ const project = await sanityClient.fetch<Project | null>(
     },
 
     mensaje{
-      texto,
+      texto{es,en},
       imagenes[]{
         ...,
         asset->
@@ -105,7 +192,7 @@ const project = await sanityClient.fetch<Project | null>(
     },
 
     inspiracion{
-      texto,
+      texto{es,en},
       imagenes[]{
         ...,
         asset->
@@ -113,35 +200,97 @@ const project = await sanityClient.fetch<Project | null>(
     },
 
     intencion{
-      texto,
+      texto{es,en},
       imagenes[]{
         ...,
         asset->
       }
     },
 
-    informacionRecalcable
+    informacionRecalcable{es,en}
   }`,
   { slug }
 )
 
+const project: ProjectMapped | null = projectRaw
+  ? {
+      titulo: pickLocalized(projectRaw.titulo, defaultLang),
+      tituloEs: pickLocalized(projectRaw.titulo, 'es'),
+      tituloEn: pickLocalized(projectRaw.titulo, 'en'),
+      slug: projectRaw.slug,
+      anio: projectRaw.anio,
+      tags: getLocalizedTags(projectRaw.tags, defaultLang),
+      tagsEs: getLocalizedTags(projectRaw.tags, 'es'),
+      tagsEn: getLocalizedTags(projectRaw.tags, 'en'),
+      imagencover: projectRaw.imagencover,
+      links: mapLocalizedLinks(projectRaw.links),
+      introduccion: mapLocalizedBlock(projectRaw.introduccion),
+      tecnicas: {
+        ...mapLocalizedBlock(projectRaw.tecnicas),
+        tags: getLocalizedTags(projectRaw.tecnicas?.tags, defaultLang),
+        tagsEs: getLocalizedTags(projectRaw.tecnicas?.tags, 'es'),
+        tagsEn: getLocalizedTags(projectRaw.tecnicas?.tags, 'en'),
+      },
+      mensaje: mapLocalizedBlock(projectRaw.mensaje),
+      inspiracion: mapLocalizedBlock(projectRaw.inspiracion),
+      intencion: mapLocalizedBlock(projectRaw.intencion),
+      informacionRecalcable: pickLocalized(projectRaw.informacionRecalcable, defaultLang),
+      informacionRecalcableEs: pickLocalized(projectRaw.informacionRecalcable, 'es'),
+      informacionRecalcableEn: pickLocalized(projectRaw.informacionRecalcable, 'en'),
+    }
+  : null;
+
 const imageUrl = (image?: SanityImage) => image?.asset?.url
+
+const sectionTitles = {
+  tecnicas: { es: 'Tecnicas', en: 'Techniques' },
+  mensaje: { es: 'Mensaje', en: 'Message' },
+  inspiracion: { es: 'Inspiracion', en: 'Inspiration' },
+  intencion: { es: 'Intencion', en: 'Intention' },
+  informacionRecalcable: { es: 'Informacion recalcable', en: 'Highlighted information' },
+};
 
 const optionalSections: Array<{
   key: string
   title: string
-  data?: ContentBlock | TecnicasBlock
+  titleEs: string
+  titleEn: string
+  data?: ProjectContentBlock | ProjectTecnicasBlock
 }> = [
-  { key: 'tecnicas', title: 'Tecnicas', data: project?.tecnicas },
-  { key: 'mensaje', title: 'Mensaje', data: project?.mensaje },
-  { key: 'inspiracion', title: 'Inspiracion', data: project?.inspiracion },
-  { key: 'intencion', title: 'Intencion', data: project?.intencion },
+  {
+    key: 'tecnicas',
+    title: defaultLang === 'en' ? sectionTitles.tecnicas.en : sectionTitles.tecnicas.es,
+    titleEs: sectionTitles.tecnicas.es,
+    titleEn: sectionTitles.tecnicas.en,
+    data: project?.tecnicas,
+  },
+  {
+    key: 'mensaje',
+    title: defaultLang === 'en' ? sectionTitles.mensaje.en : sectionTitles.mensaje.es,
+    titleEs: sectionTitles.mensaje.es,
+    titleEn: sectionTitles.mensaje.en,
+    data: project?.mensaje,
+  },
+  {
+    key: 'inspiracion',
+    title: defaultLang === 'en' ? sectionTitles.inspiracion.en : sectionTitles.inspiracion.es,
+    titleEs: sectionTitles.inspiracion.es,
+    titleEn: sectionTitles.inspiracion.en,
+    data: project?.inspiracion,
+  },
+  {
+    key: 'intencion',
+    title: defaultLang === 'en' ? sectionTitles.intencion.en : sectionTitles.intencion.es,
+    titleEs: sectionTitles.intencion.es,
+    titleEn: sectionTitles.intencion.en,
+    data: project?.intencion,
+  },
 ].filter((section) => {
-  const hasText = Boolean(section.data?.texto)
+  const hasText = Boolean(section.data?.textoEs || section.data?.textoEn)
   const hasImages = Boolean(section.data?.imagenes?.length)
   const hasTags =
     section.key === 'tecnicas' &&
-    Boolean((section.data as TecnicasBlock | undefined)?.tags?.length)
+    Boolean((section.data as ProjectTecnicasBlock | undefined)?.tagsEs?.length || (section.data as ProjectTecnicasBlock | undefined)?.tagsEn?.length)
 
   return hasText || hasImages || hasTags
 })
@@ -154,7 +303,7 @@ const optionalSections: Array<{
     aria-label="Sección principal"
       id="proyectos"
         style="margin: 0 auto; width: 100%; max-width: 1800px; "
-  class="px-6 sm:px-12 lg:px-24"
+  class="px-6 sm:px-12 lg:px-24 pb-20"
   >
 
   {project ? (
@@ -169,7 +318,11 @@ const optionalSections: Array<{
           <!-- Título + chevron -->
           <div class="flex items-center gap-4">
             <h2 class="font-manrope font-black tracking-tighter leading-none text-neutral-100
-                       text-[clamp(2.8rem,7vw,5rem)] uppercase">
+                       text-[clamp(2.8rem,7vw,5rem)] uppercase"
+                data-i18n-project-text
+                data-es={project.tituloEs ?? ''}
+                data-en={project.tituloEn ?? ''}
+            >
               {project.titulo}
             </h2>
             <!-- Chevron down -->
@@ -184,7 +337,13 @@ const optionalSections: Array<{
           </div>
  
           <!-- Category chips -->
-          <div class="flex flex-wrap gap-2">
+          <div
+            class="flex flex-wrap gap-2"
+            data-i18n-project-tags
+            data-tag-class="chip"
+            data-es={JSON.stringify(project.tagsEs ?? [])}
+            data-en={JSON.stringify(project.tagsEn ?? [])}
+          >
             {project.tags?.map((tag) => (
               <span class="chip">{tag}</span>
             ))}
@@ -193,7 +352,13 @@ const optionalSections: Array<{
           <!-- Introducción (obligatoria) -->
           <div class="mt-1">
             <p class="font-inter text-sm text-neutral-400 leading-relaxed">
-              {project.introduccion?.texto}
+              <span
+                data-i18n-project-text
+                data-es={project.introduccion?.textoEs ?? ''}
+                data-en={project.introduccion?.textoEn ?? ''}
+              >
+                {project.introduccion?.texto}
+              </span>
             </p>
           </div>
  
@@ -210,7 +375,13 @@ const optionalSections: Array<{
                   rel="noopener noreferrer"
                   class="chip"
                 >
-                  {link.label ?? 'Ver enlace'}
+                  <span
+                    data-i18n-project-text
+                    data-es={link.labelEs ?? 'Ver enlace'}
+                    data-en={link.labelEn ?? 'View link'}
+                  >
+                    {link.label ?? 'Ver enlace'}
+                  </span>
                 </a>
               ))}
             </div>
@@ -224,7 +395,7 @@ const optionalSections: Array<{
           {imageUrl(project.imagencover) ? (
             <img
               src={imageUrl(project.imagencover)}
-              alt={`Imagen de portada de ${project.titulo}`}
+              alt={defaultLang === 'en' ? `Cover image of ${project.titulo}` : `Imagen de portada de ${project.titulo}`}
               class="w-full h-full object-cover"
               loading="lazy"
             />
@@ -255,14 +426,19 @@ const optionalSections: Array<{
                   {imageUrl(image) ? (
                     <img
                       src={imageUrl(image)}
-                      alt={`Imagen de introduccion de ${project.titulo}`}
+                      alt={defaultLang === 'en' ? `Introduction image of ${project.titulo}` : `Imagen de introduccion de ${project.titulo}`}
                       class="w-full h-full object-cover"
                       loading="lazy"
                     />
                   ) : (
                     <div class="project-img-placeholder flex items-center justify-center h-full">
-                      <span class="font-inter text-[10px] uppercase tracking-widest text-neutral-600">
-                        Imagen no disponible
+                      <span
+                        class="font-inter text-[10px] uppercase tracking-widest text-neutral-600"
+                        data-i18n-project-text
+                        data-es="Imagen no disponible"
+                        data-en="Image unavailable"
+                      >
+                        {defaultLang === 'en' ? 'Image unavailable' : 'Imagen no disponible'}
                       </span>
                     </div>
                   )}
@@ -277,14 +453,35 @@ const optionalSections: Array<{
       {optionalSections.map((section) => (
         <div class="project-gallery mt-10" id={section.key}>
           <div class="mb-5">
-            <p class="font-inter text-xs text-neutral-500 uppercase tracking-widest mb-2">{section.title}</p>
+            <h3
+              class=" text-neutral-500 uppercase tracking-widest mb-2"
+              data-i18n-project-text
+              data-es={section.titleEs}
+              data-en={section.titleEn}
+            >
+              {section.title}
+            </h3>
             {section.data?.texto && (
-              <p class="font-inter text-sm text-neutral-400 leading-relaxed">{section.data.texto}</p>
+              <p class="font-inter text-sm text-neutral-400 leading-relaxed">
+                <span
+                  data-i18n-project-text
+                  data-es={section.data.textoEs ?? ''}
+                  data-en={section.data.textoEn ?? ''}
+                >
+                  {section.data.texto}
+                </span>
+              </p>
             )}
 
-            {section.key === 'tecnicas' && (section.data as TecnicasBlock)?.tags && (
-              <div class="mt-3 flex flex-wrap gap-2">
-                {(section.data as TecnicasBlock).tags?.map((tag) => (
+            {section.key === 'tecnicas' && (section.data as ProjectTecnicasBlock)?.tags && (
+              <div
+                class="mt-3 flex flex-wrap gap-2"
+                data-i18n-project-tags
+                data-tag-class="chip"
+                data-es={JSON.stringify((section.data as ProjectTecnicasBlock).tagsEs ?? [])}
+                data-en={JSON.stringify((section.data as ProjectTecnicasBlock).tagsEn ?? [])}
+              >
+                {(section.data as ProjectTecnicasBlock).tags?.map((tag) => (
                   <span class="chip">{tag}</span>
                 ))}
               </div>
@@ -305,14 +502,19 @@ const optionalSections: Array<{
                   {imageUrl(image) ? (
                     <img
                       src={imageUrl(image)}
-                      alt={`Imagen de ${section.title.toLowerCase()} de ${project.titulo}`}
+                      alt={defaultLang === 'en' ? `Image of ${section.titleEn.toLowerCase()} from ${project.titulo}` : `Imagen de ${section.title.toLowerCase()} de ${project.titulo}`}
                       class="w-full h-full object-cover"
                       loading="lazy"
                     />
                   ) : (
                     <div class="project-img-placeholder flex items-center justify-center h-full">
-                      <span class="font-inter text-[10px] uppercase tracking-widest text-neutral-600">
-                        Imagen no disponible
+                      <span
+                        class="font-inter text-[10px] uppercase tracking-widest text-neutral-600"
+                        data-i18n-project-text
+                        data-es="Imagen no disponible"
+                        data-en="Image unavailable"
+                      >
+                        {defaultLang === 'en' ? 'Image unavailable' : 'Imagen no disponible'}
                       </span>
                     </div>
                   )}
@@ -325,18 +527,102 @@ const optionalSections: Array<{
 
       {project.informacionRecalcable && (
         <div class="project-gallery mt-10">
-          <p class="font-inter text-xs text-neutral-500 uppercase tracking-widest mb-2">Informacion recalcable</p>
-          <p class="font-inter text-sm text-neutral-400 leading-relaxed">{project.informacionRecalcable}</p>
+          <p
+            class="font-inter text-xs text-neutral-500 uppercase tracking-widest mb-2"
+            data-i18n-project-text
+            data-es={sectionTitles.informacionRecalcable.es}
+            data-en={sectionTitles.informacionRecalcable.en}
+          >
+            {defaultLang === 'en' ? sectionTitles.informacionRecalcable.en : sectionTitles.informacionRecalcable.es}
+          </p>
+          <p class="font-inter text-sm text-neutral-400 leading-relaxed">
+            <span
+              data-i18n-project-text
+              data-es={project.informacionRecalcableEs ?? ''}
+              data-en={project.informacionRecalcableEn ?? ''}
+            >
+              {project.informacionRecalcable}
+            </span>
+          </p>
         </div>
       )}
  
     </article>
   ) : (
     <article class="project-entry">
-      <p class="font-inter text-sm text-neutral-400">Proyecto no encontrado.</p>
+      <p
+        class="font-inter text-sm text-neutral-400"
+        data-i18n-project-text
+        data-es="Proyecto no encontrado."
+        data-en="Project not found."
+      >
+        {defaultLang === 'en' ? 'Project not found.' : 'Proyecto no encontrado.'}
+      </p>
     </article>
   )}
  
 </section>
 <Footer/>
 </Layout>
+
+<script>
+  import { LANG_STORAGE_KEY } from '../../i18n/translations';
+
+  function initProjectLanguage() {
+    const textNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-project-text]'),
+    );
+    const tagNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-project-tags]'),
+    );
+
+    function sanitizeLang(value: string | null): 'es' | 'en' {
+      return value === 'en' ? 'en' : 'es';
+    }
+
+    function parseLocalizedList(node: HTMLElement, lang: 'es' | 'en') {
+      const raw = node.getAttribute(`data-${lang}`) ?? '[]';
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((item): item is string => typeof item === 'string');
+      } catch {
+        return [];
+      }
+    }
+
+    function applyProjectLanguage(lang: 'es' | 'en') {
+      textNodes.forEach((node) => {
+        const localizedText = node.getAttribute(`data-${lang}`)?.trim();
+        if (!localizedText) return;
+        node.textContent = localizedText;
+      });
+
+      tagNodes.forEach((node) => {
+        const localizedTags = parseLocalizedList(node, lang);
+        const tags = localizedTags.length > 0 ? localizedTags : "";
+        const tagClass = node.getAttribute('data-tag-class') ?? 'chip';
+
+        node.innerHTML = '';
+        tags.forEach((tag) => {
+          const tagNode = document.createElement('span');
+          tagNode.className = tagClass;
+          tagNode.textContent = tag;
+          node.appendChild(tagNode);
+        });
+      });
+    }
+
+    const initialLang = sanitizeLang(localStorage.getItem(LANG_STORAGE_KEY));
+    applyProjectLanguage(initialLang);
+
+    window.addEventListener('site-language-change', (event) => {
+      const customEvent = event as CustomEvent<{ lang?: string }>;
+      applyProjectLanguage(sanitizeLang(customEvent.detail?.lang ?? null));
+    });
+  }
+
+  document.addEventListener('astro:page-load', initProjectLanguage);
+  initProjectLanguage();
+</script>

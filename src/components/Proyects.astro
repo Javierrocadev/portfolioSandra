@@ -1,23 +1,75 @@
 ---
 import { sanityClient } from "../lib/sanity";
-import { DEFAULT_LANG, LANG_STORAGE_KEY, translations } from "../i18n/translations";
+import { DEFAULT_LANG, translations } from "../i18n/translations";
+
+type LocalizedText = {
+  es?: string;
+  en?: string;
+};
+
+type ProjectTag = {
+  label?: LocalizedText;
+};
+
+type ProjectLink = {
+  label?: LocalizedText;
+  url?: string;
+};
 
 type ProjectImage = {
   url?: string;
   alt?: string;
   titulo?: string;
+  tituloEs?: string;
+  tituloEn?: string;
   descripcion?: string;
   tags?: string[];
-  links?: { label?: string; url?: string }[];
+  tagsEs?: string[];
+  tagsEn?: string[];
+  links?: ProjectLink[];
   slug?: { current?: string };
 };
 
-const proyects = await sanityClient.fetch(`
+type SanityProject = {
+  titulo?: LocalizedText;
+  descripcioncorta?: LocalizedText;
+  tags?: (ProjectTag | null)[];
+  links?: (ProjectLink | null)[];
+  slug?: { current?: string };
+  imagencover?: { asset?: { url?: string }; alt?: string };
+};
+
+const defaultLang = DEFAULT_LANG;
+
+const pickLocalized = (value: LocalizedText | undefined, lang: "es" | "en") => {
+  if (!value) return "";
+  return lang === "en" ? value.en ?? value.es ?? "" : value.es ?? value.en ?? "";
+};
+
+const getLocalizedTags = (tags: (ProjectTag | null)[] | undefined, lang: "es" | "en") =>
+  (tags ?? [])
+    .map((tag) => {
+      if (!tag?.label) return "";
+      return lang === "en"
+        ? tag.label.en ?? tag.label.es ?? ""
+        : tag.label.es ?? tag.label.en ?? "";
+    })
+    .filter(Boolean);
+
+const getSafeLinks = (links: (ProjectLink | null)[] | undefined) =>
+  (links ?? []).filter((link): link is ProjectLink => Boolean(link));
+
+const proyects = await sanityClient.fetch<SanityProject[]>(`
 *[_type == "proyecto"][0..4]{
-  titulo,
-  descripcioncorta,
-  tags,
-  links,
+  titulo{es,en},
+  descripcioncorta{es,en},
+  tags[]->{
+    label{es,en}
+  },
+  links[]{
+    label{es,en},
+    url
+  },
   slug,
   imagencover{
     asset->{
@@ -29,21 +81,18 @@ const proyects = await sanityClient.fetch(`
 
 const projectImages: ProjectImage[] = proyects
   .flatMap(
-    (project: {
-      titulo?: string;
-      descripcioncorta?: string;
-      tags?: string[];
-      links?: { label?: string; url?: string }[];
-      imagencover?: { asset?: { url?: string }; alt?: string };
-      slug?: { current?: string };
-    }) =>
+    (project) =>
       (project.imagencover ? [project.imagencover] : []).map((image) => ({
         url: image?.asset?.url,
         alt: image?.alt,
-        titulo: project.titulo,
-        descripcion: project.descripcioncorta,
-        tags: project.tags,
-        links: project.links,
+        titulo: pickLocalized(project.titulo, defaultLang),
+        tituloEs: pickLocalized(project.titulo, "es"),
+        tituloEn: pickLocalized(project.titulo, "en"),
+        descripcion: pickLocalized(project.descripcioncorta, defaultLang),
+        tagsEs: getLocalizedTags(project.tags, "es"),
+        tagsEn: getLocalizedTags(project.tags, "en"),
+        tags: getLocalizedTags(project.tags, defaultLang),
+        links: getSafeLinks(project.links),
         slug: project.slug,
       })),
   )
@@ -69,7 +118,6 @@ const grid2Slots = [
 const getProjectHref = (slug?: { current?: string }) =>
   slug?.current ? `/proyecto/${slug.current}` : "#";
 
-const defaultLang = DEFAULT_LANG;
 const projectsDictionary = translations;
 ---
 
@@ -114,15 +162,20 @@ const projectsDictionary = translations;
                     alt={
                       slot.image.alt ??
                       slot.image.titulo ??
-                      "Imagen de proyecto"
+                      (defaultLang === "en" ? "Project image" : "Imagen de proyecto")
                     }
                     class="w-full h-full object-cover min-h-64"
                   />
 
                   <div class="absolute inset-0 bg-gradient-to-r from-black/92 via-black/60 to-black/20 opacity-30 transition-opacity duration-500 group-hover:opacity-100" />
                   <div class="absolute top-6 left-6 flex flex-col gap-1 opacity-0 translate-y-2.5 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
-                    <div class="flex flex-wrap gap-2">
-                      {(slot.image.tags?.slice(0, 3) ?? ["Project"]).map(
+                    <div
+                      class="flex flex-wrap gap-2"
+                      data-i18n-project-tags
+                      data-es={JSON.stringify(slot.image.tagsEs ?? [])}
+                      data-en={JSON.stringify(slot.image.tagsEn ?? [])}
+                    >
+                      {(slot.image.tags?.slice(0, 3) ?? [defaultLang === "en" ? "Project" : "Proyecto"]).map(
                         (tag: string) => (
                           <span class="text-white/60 text-[11px] uppercase tracking-[2.5px]">
                             {tag}
@@ -140,8 +193,13 @@ const projectsDictionary = translations;
             Ver proyecto
           </a>
         )} */}
-                  <h3 class="absolute bottom-6 left-6 text-white font-['Instrument_Serif'] text-4xl font-normal">
-                    {slot.image.titulo ?? "Proyecto"}
+                  <h3
+                    class="absolute bottom-6 left-6 text-white font-['Instrument_Serif'] text-4xl font-normal"
+                    data-i18n-project-title
+                    data-es={slot.image.tituloEs ?? ""}
+                    data-en={slot.image.tituloEn ?? ""}
+                  >
+                    {slot.image.titulo ?? (defaultLang === "en" ? "Project" : "Proyecto")}
                   </h3>
                 </a>
               )}
@@ -190,8 +248,11 @@ const projectsDictionary = translations;
                   <div class="bg-transparent group-hover:scale-150 -top-24 -right-12 absolute shadow-white/10 shadow-inner rounded-full transition-all ease-in-out group-hover:duration-1000 duration-1000 w-64 h-64" />
                   <div class="bg-transparent group-hover:scale-150 top-24 right-12 absolute shadow-white/10 shadow-inner rounded-full transition-all ease-in-out group-hover:duration-1000 duration-1000 w-4 h-4" />
                   <div class="w-full h-full shadow-xl shadow-neutral-900 p-6  opacity-80 group-hover:opacity-100 transition-all duration-500 rounded-xl flex-col gap-2 flex justify-start">
-                    <h3 class="text-white font-['Instrument_Serif'] text-4xl font-normal mb-4">
-                      Explora más...
+                    <h3
+                      class="text-white font-['Instrument_Serif'] text-4xl font-normal mb-4"
+                      data-i18n-proyects="exploreMore"
+                    >
+                      {projectsDictionary[defaultLang].general.exploreMore}
                     </h3>
                     <a
                       href="/myproyects"
@@ -225,15 +286,20 @@ const projectsDictionary = translations;
                     alt={
                       slot.image.alt ??
                       slot.image.titulo ??
-                      "Imagen de proyecto"
+                      (defaultLang === "en" ? "Project image" : "Imagen de proyecto")
                     }
                     class="w-full h-full object-cover min-h-64"
                   />
 
                   <div class="absolute inset-0 bg-gradient-to-r from-black/92 via-black/60 to-black/20 opacity-30 transition-opacity duration-500 group-hover:opacity-100" />
                   <div class="absolute top-6 left-6 flex flex-col gap-1 opacity-0 translate-y-2.5 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-400">
-                    <div class="flex flex-wrap gap-2">
-                      {(slot.image.tags?.slice(0, 3) ?? ["Project"]).map(
+                    <div
+                      class="flex flex-wrap gap-2"
+                      data-i18n-project-tags
+                      data-es={JSON.stringify(slot.image.tagsEs ?? [])}
+                      data-en={JSON.stringify(slot.image.tagsEn ?? [])}
+                    >
+                      {(slot.image.tags?.slice(0, 3) ?? [defaultLang === "en" ? "Project" : "Proyecto"]).map(
                         (tag: string) => (
                           <span class="text-white/60 text-[11px] uppercase tracking-[2.5px]">
                             {tag}
@@ -251,8 +317,13 @@ const projectsDictionary = translations;
             Ver proyecto
           </a>
         )} */}
-                  <h3 class="absolute bottom-6 left-6 text-white font-['Instrument_Serif'] text-4xl font-normal">
-                    {slot.image.titulo ?? "Proyecto"}
+                  <h3
+                    class="absolute bottom-6 left-6 text-white font-['Instrument_Serif'] text-4xl font-normal"
+                    data-i18n-project-title
+                    data-es={slot.image.tituloEs ?? ""}
+                    data-en={slot.image.tituloEn ?? ""}
+                  >
+                    {slot.image.titulo ?? (defaultLang === "en" ? "Project" : "Proyecto")}
                   </h3>
                 </a>
               )}
@@ -276,9 +347,27 @@ const projectsDictionary = translations;
     const i18nNodes = Array.from(
       document.querySelectorAll<HTMLElement>("[data-i18n-proyects]"),
     );
+    const projectTitleNodes = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-i18n-project-title]"),
+    );
+    const projectTagsNodes = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-i18n-project-tags]"),
+    );
 
     function sanitizeLang(value: string | null): "es" | "en" {
       return value === "en" ? "en" : "es";
+    }
+
+    function parseLocalizedList(node: HTMLElement, lang: "es" | "en") {
+      const raw = node.getAttribute(`data-${lang}`) ?? "[]";
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((item): item is string => typeof item === "string");
+      } catch {
+        return [];
+      }
     }
 
     function applyProyectsLanguage(lang: "es" | "en") {
@@ -288,6 +377,24 @@ const projectsDictionary = translations;
         const key = node.dataset.i18nProyects as keyof typeof dictionary | undefined;
         if (!key) return;
         node.textContent = dictionary[key];
+      });
+
+      projectTitleNodes.forEach((node) => {
+        const localizedTitle = node.getAttribute(`data-${lang}`)?.trim();
+        node.textContent = localizedTitle || (lang === "en" ? "Project" : "Proyecto");
+      });
+
+      projectTagsNodes.forEach((node) => {
+        const localizedTags = parseLocalizedList(node, lang).slice(0, 3);
+        const tags = localizedTags.length > 0 ? localizedTags : [lang === "en" ? "Project" : "Proyecto"];
+
+        node.innerHTML = "";
+        tags.forEach((tag) => {
+          const tagNode = document.createElement("span");
+          tagNode.className = "text-white/60 text-[11px] uppercase tracking-[2.5px]";
+          tagNode.textContent = tag;
+          node.appendChild(tagNode);
+        });
       });
     }
 

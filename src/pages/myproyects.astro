@@ -3,39 +3,132 @@ import Layout from '../layouts/Layout.astro';
 import "../styles/global.css";
 import { sanityClient } from '../lib/sanity'
 import Footer from '../components/Footer.astro';
-import { DEFAULT_LANG, LANG_STORAGE_KEY, translations } from '../i18n/translations';
+import { DEFAULT_LANG, translations } from '../i18n/translations';
 
-type Project = {
-  titulo?: string
-  descripcioncorta?: string
+type LocalizedText = {
+  es?: string
+  en?: string
+}
+
+type ProjectTag = {
+  label?: LocalizedText
+}
+
+type ProjectLink = {
+  label?: LocalizedText
+  url?: string
+}
+
+type SanityProject = {
+  titulo?: LocalizedText
+  descripcioncorta?: LocalizedText
   imagencover?: {
     asset?: {
       url?: string
     }
   }
-  tags?: string[]
-  links?: { label?: string; url?: string }[]
+  tags?: (ProjectTag | null)[]
+  links?: (ProjectLink | null)[]
   slug?: {
     current?: string
   }
 }
 
-const projects = await sanityClient.fetch<Project[]>(`
+type ProjectCard = {
+  titulo: string
+  tituloEs: string
+  tituloEn: string
+  descripcion: string
+  descripcionEs: string
+  descripcionEn: string
+  imagencover?: {
+    asset?: {
+      url?: string
+    }
+  }
+  tags: string[]
+  tagsEs: string[]
+  tagsEn: string[]
+  links: { label: string; labelEs: string; labelEn: string; url: string }[]
+  slug?: {
+    current?: string
+  }
+}
+
+const defaultLang = DEFAULT_LANG;
+
+const pickLocalized = (value: LocalizedText | undefined, lang: 'es' | 'en') => {
+  if (!value) return '';
+  return lang === 'en' ? value.en ?? value.es ?? '' : value.es ?? value.en ?? '';
+}
+
+const getLocalizedTags = (tags: (ProjectTag | null)[] | undefined, lang: 'es' | 'en') =>
+  (tags ?? [])
+    .map((tag) => {
+      if (!tag?.label) return '';
+      return lang === 'en'
+        ? tag.label.en ?? tag.label.es ?? ''
+        : tag.label.es ?? tag.label.en ?? '';
+    })
+    .filter(Boolean)
+
+const getLocalizedLinks = (links: (ProjectLink | null)[] | undefined) =>
+  (links ?? [])
+    .filter((link): link is ProjectLink => Boolean(link?.url))
+    .map((link) => {
+      const labelEs = link.label?.es ?? link.label?.en ?? 'Ver enlace';
+      const labelEn = link.label?.en ?? link.label?.es ?? 'View link';
+
+      return {
+        label: defaultLang === 'en' ? labelEn : labelEs,
+        labelEs,
+        labelEn,
+        url: link.url as string,
+      };
+    })
+
+const projectsRaw = await sanityClient.fetch<SanityProject[]>(`
 *[_type == "proyecto"][]{
-  titulo,
-  descripcioncorta,
+  titulo{es,en},
+  descripcioncorta{es,en},
   imagencover{
     asset->{
       url
     }
   },
-  tags,
-  links,
+  tags[]->{
+    label{es,en}
+  },
+  links[]{
+    label{es,en},
+    url
+  },
   slug,
 }
 `);
 
-const defaultLang = DEFAULT_LANG;
+const projects: ProjectCard[] = projectsRaw.map((project) => {
+  const tituloEs = pickLocalized(project.titulo, 'es');
+  const tituloEn = pickLocalized(project.titulo, 'en');
+  const descripcionEs = pickLocalized(project.descripcioncorta, 'es');
+  const descripcionEn = pickLocalized(project.descripcioncorta, 'en');
+
+  return {
+    titulo: pickLocalized(project.titulo, defaultLang),
+    tituloEs,
+    tituloEn,
+    descripcion: pickLocalized(project.descripcioncorta, defaultLang),
+    descripcionEs,
+    descripcionEn,
+    imagencover: project.imagencover,
+    tags: getLocalizedTags(project.tags, defaultLang),
+    tagsEs: getLocalizedTags(project.tags, 'es'),
+    tagsEn: getLocalizedTags(project.tags, 'en'),
+    links: getLocalizedLinks(project.links),
+    slug: project.slug,
+  };
+});
+
 const pageDictionary = translations;
 
 
@@ -69,7 +162,11 @@ const pageDictionary = translations;
           <!-- Título + chevron -->
           <div class="flex items-center gap-4">
             <h2 class="font-manrope font-black tracking-tighter leading-none text-neutral-100
-                       text-[clamp(2.8rem,7vw,5rem)] uppercase">
+                       text-[clamp(2.8rem,7vw,5rem)] uppercase"
+                data-i18n-myprojects-title
+                data-es={project.tituloEs}
+                data-en={project.tituloEn}
+            >
               {project.titulo}
             </h2>
             <!-- Chevron down -->
@@ -84,7 +181,12 @@ const pageDictionary = translations;
           </div>
  
           <!-- Category chips -->
-          <div class="flex flex-wrap gap-2">
+          <div
+            class="flex flex-wrap gap-2"
+            data-i18n-myprojects-tags
+            data-es={JSON.stringify(project.tagsEs)}
+            data-en={JSON.stringify(project.tagsEn)}
+          >
             {project.tags?.map((tag) => (
               <span class="chip">{tag}</span>
             ))}
@@ -95,8 +197,13 @@ const pageDictionary = translations;
             {/* <p class="font-inter text-xs text-neutral-500 uppercase tracking-widest mb-3">
               Introducción tiene asociado:
             </p> */}
-            <p class="font-inter text-sm text-neutral-400 leading-relaxed">
-              {project.descripcioncorta}
+            <p
+              class="font-inter text-sm text-neutral-400 leading-relaxed"
+              data-i18n-myprojects-description
+              data-es={project.descripcionEs}
+              data-en={project.descripcionEn}
+            >
+              {project.descripcion}
             </p>
           </div>
 
@@ -109,7 +216,13 @@ const pageDictionary = translations;
                   rel="noopener noreferrer"
                   class="chip"
                 >
-                  {link.label ?? 'Ver enlace'}
+                  <span
+                    data-i18n-myprojects-link-label
+                    data-es={link.labelEs}
+                    data-en={link.labelEn}
+                  >
+                    {link.label}
+                  </span>
                 </a>
               ))}
             </div>
@@ -152,7 +265,7 @@ const pageDictionary = translations;
           {project.imagencover?.asset?.url ? (
             <img
               src={project.imagencover.asset.url}
-              alt={`Imagen de portada de ${project.titulo}`}
+              alt={defaultLang === 'en' ? `Cover image of ${project.titulo}` : `Imagen de portada de ${project.titulo}`}
               class="w-full h-full object-cover"
               loading="lazy"
             />
@@ -187,9 +300,33 @@ const pageDictionary = translations;
     const i18nNodes = Array.from(
       document.querySelectorAll<HTMLElement>('[data-i18n-myprojects]'),
     );
+    const projectTitleNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-myprojects-title]'),
+    );
+    const projectDescriptionNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-myprojects-description]'),
+    );
+    const projectTagsNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-myprojects-tags]'),
+    );
+    const projectLinkNodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-i18n-myprojects-link-label]'),
+    );
 
     function sanitizeLang(value: string | null): 'es' | 'en' {
       return value === 'en' ? 'en' : 'es';
+    }
+
+    function parseLocalizedList(node: HTMLElement, lang: 'es' | 'en') {
+      const raw = node.getAttribute(`data-${lang}`) ?? '[]';
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.filter((item): item is string => typeof item === 'string');
+      } catch {
+        return [];
+      }
     }
 
     function applyMyProjectsLanguage(lang: 'es' | 'en') {
@@ -199,6 +336,34 @@ const pageDictionary = translations;
         const key = node.dataset.i18nMyprojects as keyof typeof dictionary | undefined;
         if (!key) return;
         node.textContent = dictionary[key];
+      });
+
+      projectTitleNodes.forEach((node) => {
+        const localizedTitle = node.getAttribute(`data-${lang}`)?.trim();
+        node.textContent = localizedTitle || (lang === 'en' ? 'Project' : 'Proyecto');
+      });
+
+      projectDescriptionNodes.forEach((node) => {
+        const localizedDescription = node.getAttribute(`data-${lang}`)?.trim();
+        node.textContent = localizedDescription || '';
+      });
+
+      projectTagsNodes.forEach((node) => {
+        const localizedTags = parseLocalizedList(node, lang);
+        const tags = localizedTags.length > 0 ? localizedTags : [lang === 'en' ? 'Project' : 'Proyecto'];
+
+        node.innerHTML = '';
+        tags.forEach((tag) => {
+          const tagNode = document.createElement('span');
+          tagNode.className = 'chip';
+          tagNode.textContent = tag;
+          node.appendChild(tagNode);
+        });
+      });
+
+      projectLinkNodes.forEach((node) => {
+        const localizedLabel = node.getAttribute(`data-${lang}`)?.trim();
+        node.textContent = localizedLabel || (lang === 'en' ? 'View link' : 'Ver enlace');
       });
     }
 
