@@ -1,0 +1,70 @@
+---
+interface Props {
+  id?: string;
+  url?: string;
+  title?: string;
+}
+
+const { id, url, title = "YouTube video" } = Astro.props;
+
+const directIdPattern = /^[A-Za-z0-9_-]{11}$/;
+
+const extractYouTubeId = (value?: string) => {
+  if (!value) return "";
+  const input = value.trim();
+  if (!input) return "";
+
+  if (directIdPattern.test(input)) {
+    return input;
+  }
+
+  try {
+    const parsed = new URL(input);
+    const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+
+    if (host === "youtu.be") {
+      const idFromPath = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+      return directIdPattern.test(idFromPath) ? idFromPath : "";
+    }
+
+    if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+      const idFromQuery = parsed.searchParams.get("v") ?? "";
+      if (directIdPattern.test(idFromQuery)) {
+        return idFromQuery;
+      }
+
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      const lastPart = parts[parts.length - 1] ?? "";
+      if ((parts[0] === "embed" || parts[0] === "shorts") && directIdPattern.test(lastPart)) {
+        return lastPart;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+};
+
+const resolvedId = extractYouTubeId(id) || extractYouTubeId(url);
+---
+
+<div class="relative w-full aspect-video rounded-2xl overflow-hidden">
+  {
+    resolvedId ? (
+      <iframe
+        class="absolute inset-0 w-full h-full"
+        src={`https://www.youtube.com/embed/${resolvedId}`}
+        title={title}
+        loading="lazy"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+        referrerpolicy="strict-origin-when-cross-origin"
+      ></iframe>
+    ) : (
+      <div class="absolute inset-0 flex items-center justify-center bg-[#191a1a] text-neutral-500 text-sm">
+        Invalid YouTube URL/ID
+      </div>
+    )
+  }
+</div>

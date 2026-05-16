@@ -158,7 +158,7 @@ export const proyectoType = defineType({
             }),
         }),
       ],
-      validation: (rule) => rule.unique(),
+      validation: (rule) => rule.unique().max(4),
     }),
 
     // INTRODUCCIÓN

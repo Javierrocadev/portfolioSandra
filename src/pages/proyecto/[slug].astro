@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import "../../styles/global.css";
 import { sanityClient } from '../../lib/sanity'
+import YouTube from "../../components/Youtube.astro";
 import Footer from '../../components/Footer.astro';
 import { DEFAULT_LANG, LANG_STORAGE_KEY } from '../../i18n/translations';
 
@@ -39,6 +40,7 @@ type ProjectRaw = {
   tags?: (SanityTag | null)[]
   imagencover?: SanityImage
   links?: ({ label?: LocalizedText; url?: string } | null)[]
+  youtubeLinks?: (string | null)[]
   introduccion?: LocalizedContentBlock
   tecnicas?: LocalizedTecnicasBlock
   mensaje?: LocalizedContentBlock
@@ -73,6 +75,7 @@ type ProjectMapped = {
   tagsEn?: string[]
   imagencover?: SanityImage
   links?: { label?: string; labelEs?: string; labelEn?: string; url?: string }[]
+  youtubeIds?: string[]
   introduccion?: ProjectContentBlock
   tecnicas?: ProjectTecnicasBlock
   mensaje?: ProjectContentBlock
@@ -144,6 +147,44 @@ const mapLocalizedLinks = (links: ({ label?: LocalizedText; url?: string } | nul
       url: link.url,
     }))
 
+const extractYouTubeId = (value: string | null | undefined): string | undefined => {
+  if (!value) return undefined;
+  const input = value.trim();
+  if (!input) return undefined;
+
+  const directIdPattern = /^[A-Za-z0-9_-]{11}$/;
+  if (directIdPattern.test(input)) {
+    return input;
+  }
+
+  try {
+    const url = new URL(input);
+    const host = url.hostname.replace(/^www\./i, '').toLowerCase();
+
+    if (host === 'youtu.be') {
+      const idFromPath = url.pathname.split('/').filter(Boolean)[0];
+      return directIdPattern.test(idFromPath ?? '') ? idFromPath : undefined;
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      const idFromQuery = url.searchParams.get('v');
+      if (directIdPattern.test(idFromQuery ?? '')) {
+        return idFromQuery ?? undefined;
+      }
+
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      const lastPart = pathParts[pathParts.length - 1];
+      if ((pathParts[0] === 'embed' || pathParts[0] === 'shorts') && directIdPattern.test(lastPart ?? '')) {
+        return lastPart;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
   `*[_type == "proyecto" && slug.current == $slug][0]{
     titulo{es,en},
@@ -163,6 +204,8 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       label{es,en},
       url
     },
+
+    youtubeLinks,
 
     introduccion{
       texto{es,en},
@@ -224,6 +267,10 @@ const project: ProjectMapped | null = projectRaw
       tagsEn: getLocalizedTags(projectRaw.tags, 'en'),
       imagencover: projectRaw.imagencover,
       links: mapLocalizedLinks(projectRaw.links),
+      youtubeIds: (projectRaw.youtubeLinks ?? [])
+        .map(extractYouTubeId)
+        .filter((id): id is string => Boolean(id))
+        .slice(0, 4),
       introduccion: mapLocalizedBlock(projectRaw.introduccion),
       tecnicas: {
         ...mapLocalizedBlock(projectRaw.tecnicas),
@@ -446,6 +493,29 @@ const optionalSections: Array<{
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {project.youtubeIds && project.youtubeIds.length > 0 && (
+        <div class="project-gallery mt-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {project.youtubeIds.map((youtubeId, videoIdx) => (
+              <div
+                class:list={[
+                  project.youtubeIds && project.youtubeIds.length === 3 && videoIdx === 2
+                    ? 'sm:col-span-2'
+                    : ''
+                ]}
+              >
+                <YouTube
+                  id={youtubeId}
+                  title={defaultLang === 'en'
+                    ? `YouTube video ${videoIdx + 1} of ${project.titulo}`
+                    : `Video de YouTube ${videoIdx + 1} de ${project.titulo}`}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
