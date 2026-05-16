@@ -1,62 +1,101 @@
 ---
 import { sanityClient } from "../lib/sanity";
-import { DEFAULT_LANG, LANG_STORAGE_KEY, translations } from "../i18n/translations";
+import { DEFAULT_LANG, translations } from "../i18n/translations";
 
-type ProjectImage = {
-  url?: string;
+type GalleryImage = {
   alt?: string;
-  titulo?: {
-    es?: string;
-    en?: string;
-  };
-  slug?: { current?: string };
-};
-
-type ProjectRaw = {
-  titulo?: {
-    es?: string;
-    en?: string;
-  };
-  slug?: { current?: string };
-  imagencover?: {
-    alt?: string;
-    asset?: {
-      url?: string;
-    };
+  asset?: {
+    url?: string;
   };
 };
 
-const proyects = await sanityClient.fetch<ProjectRaw[]>(`
-*[_type == "proyecto"][0..10]{
-  titulo{
-    es,
-    en
-  },
-  slug,
-  imagencover{
-    alt,
-    asset->{
-      url
+type GalleryRaw = {
+  titulo?: string;
+  tituloEn?: string;
+  imagenes?: GalleryImage[];
+};
+
+type SliderItem = {
+  url: string;
+  alt: string;
+  tituloEs: string;
+  tituloEn: string;
+  href: string;
+};
+
+const [illustrationsRaw, photographsRaw] = await Promise.all([
+  sanityClient.fetch<GalleryRaw[]>(`
+    *[_type == "ilustraciones"]{
+      titulo,
+      tituloEn,
+      imagenes[]{
+        alt,
+        asset->{
+          url
+        }
+      }
     }
-  },
-}
-`);
+  `),
+  sanityClient.fetch<GalleryRaw[]>(`
+    *[_type == "fotografias"]{
+      titulo,
+      tituloEn,
+      imagenes[]{
+        alt,
+        asset->{
+          url
+        }
+      }
+    }
+  `),
+]);
 
-const projectImages: ProjectImage[] = proyects
-  .map((project) => ({
-    url: project?.imagencover?.asset?.url,
-    alt: project?.imagencover?.alt,
-    titulo: project?.titulo,
-    slug: project?.slug,
-  }))
-  .filter((image: ProjectImage) => Boolean(image.url));
+const shuffleItems = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [
+      shuffled[randomIndex],
+      shuffled[index],
+    ];
+  }
+  return shuffled;
+};
 
-const sliderItems = projectImages.map((item) => ({
-  url: item.url ?? "",
-  alt: item.alt ?? item.titulo?.es ?? "Proyecto",
-  titulo: item.titulo?.es ?? "Proyecto",
-  href: item.slug?.current ? `/proyecto/${item.slug.current}` : "#",
-}));
+const mapGalleryToSliderItems = (
+  galleries: GalleryRaw[],
+  href: string,
+): SliderItem[] => {
+  const groupedItems = galleries.flatMap((gallery) => {
+    const validImages = (gallery.imagenes ?? []).filter((image) =>
+      Boolean(image?.asset?.url),
+    );
+
+    const randomImages = shuffleItems(validImages).slice(0, 3);
+    const tituloEs = gallery.titulo ?? "Sin titulo";
+    const tituloEn = gallery.tituloEn ?? gallery.titulo ?? "Untitled";
+
+    return randomImages.map((image) => ({
+      url: image.asset?.url ?? "",
+      alt: image.alt ?? tituloEs,
+      tituloEs,
+      tituloEn,
+      href,
+    }));
+  });
+
+  return shuffleItems(groupedItems);
+};
+
+const sliderItemsIllustrations = mapGalleryToSliderItems(
+  illustrationsRaw,
+  "/proyecto/illustrations",
+);
+
+const sliderItemsPhotographies = mapGalleryToSliderItems(
+  photographsRaw,
+  "/proyecto/photograph",
+);
 
 const defaultLang = DEFAULT_LANG;
 const carouselDictionary = translations;
@@ -198,14 +237,26 @@ const carouselDictionary = translations;
   </section>
 </div>
 
-<script type="module" define:vars={{ sliderItems }}>
+<script
+  type="module"
+  define:vars={{ sliderItemsIllustrations, sliderItemsPhotographies }}
+>
   import KeenSlider from "https://cdn.jsdelivr.net/npm/keen-slider@6.8.6/+esm";
 
   const carouselWindow = window;
 
-  const slidesData = Array.isArray(sliderItems) ? sliderItems : [];
+  const slidesDataIllustrations = Array.isArray(sliderItemsIllustrations)
+    ? sliderItemsIllustrations
+    : [];
+  const slidesDataPhotographies = Array.isArray(sliderItemsPhotographies)
+    ? sliderItemsPhotographies
+    : [];
+  const languageStorageKey = "site-lang";
 
-  const createSlides = (items) =>
+  const sanitizeLang = (value) => (value === "en" ? "en" : "es");
+  let currentLang = sanitizeLang(localStorage.getItem(languageStorageKey));
+
+  const createSlides = (items, lang) =>
     items
       .map(
         (item) => `
@@ -222,7 +273,7 @@ const carouselDictionary = translations;
             loading="lazy"
           />
           <div class="border-t border-white/10 px-3 py-2 text-sm text-white/80">
-            ${item.titulo}
+            ${lang === "en" ? item.tituloEn : item.tituloEs}
           </div>
         </a>
       </div>
@@ -265,14 +316,14 @@ const carouselDictionary = translations;
       slider.on("updated", nextTimeout);
     };
 
-  const initCarousel = (sliderId, leftArrowId, rightArrowId) => {
+  const initCarousel = (sliderId, leftArrowId, rightArrowId, slidesData) => {
     const sliderElement = document.getElementById(sliderId);
     const arrowLeft = document.getElementById(leftArrowId);
     const arrowRight = document.getElementById(rightArrowId);
 
     if (!sliderElement || slidesData.length === 0) return null;
 
-    sliderElement.innerHTML = createSlides(slidesData);
+    sliderElement.innerHTML = createSlides(slidesData, currentLang);
 
     const slider = new KeenSlider(
       sliderElement,
@@ -320,8 +371,18 @@ const carouselDictionary = translations;
     }
 
     const cleanups = [
-      initCarousel("keen-slider-1", "arrow-left-1", "arrow-right-1"),
-      initCarousel("keen-slider-2", "arrow-left-2", "arrow-right-2"),
+      initCarousel(
+        "keen-slider-1",
+        "arrow-left-1",
+        "arrow-right-1",
+        slidesDataIllustrations,
+      ),
+      initCarousel(
+        "keen-slider-2",
+        "arrow-left-2",
+        "arrow-right-2",
+        slidesDataPhotographies,
+      ),
     ].filter((cleanup) => typeof cleanup === "function");
 
     carouselWindow.__carouselCleanup = () => {
@@ -332,6 +393,11 @@ const carouselDictionary = translations;
   };
 
   document.addEventListener("astro:page-load", initCarousels);
+  window.addEventListener("site-language-change", (event) => {
+    const customEvent = event;
+    currentLang = sanitizeLang(customEvent?.detail?.lang ?? null);
+    initCarousels();
+  });
   initCarousels();
 </script>
 
@@ -356,7 +422,9 @@ const carouselDictionary = translations;
       const dictionary = CAROUSEL_I18N[lang];
 
       i18nNodes.forEach((node) => {
-        const key = node.dataset.i18nCarousel as keyof typeof dictionary | undefined;
+        const key = node.dataset.i18nCarousel as
+          | keyof typeof dictionary
+          | undefined;
         if (!key) return;
         node.textContent = dictionary[key];
       });

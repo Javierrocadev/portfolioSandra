@@ -700,6 +700,43 @@
   color: rgba(255, 255, 255, 0.22);
 }
 
+/* Shared Masonry Gallery */
+.masonry-gallery {
+  column-count: 1;
+  column-gap: 0;
+  counter-reset: item-counter;
+}
+
+@media screen and (min-width: 400px) {
+  .masonry-gallery {
+    column-count: 1;
+  }
+}
+
+@media screen and (min-width: 600px) {
+  .masonry-gallery {
+    column-count: 2;
+  }
+}
+
+@media screen and (min-width: 1100px) {
+  .masonry-gallery {
+    column-count: 3;
+  }
+}
+
+.masonry-gallery-item {
+  box-sizing: border-box;
+  break-inside: avoid;
+  padding: 10px;
+  counter-increment: item-counter;
+}
+
+.masonry-gallery-item__content {
+  position: relative;
+  width: 100%;
+}
+
 /* ── Responsive ── */
 
 /* Tablet — single column, comfortable */
