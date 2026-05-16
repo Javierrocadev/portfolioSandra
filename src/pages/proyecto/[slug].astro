@@ -398,7 +398,7 @@ const optionalSections: Array<{
  
           <!-- Introducción (obligatoria) -->
           <div class="mt-1">
-            <p class="font-inter text-sm text-neutral-400 leading-relaxed">
+            <p class=" text-lg text-neutral-400 leading-relaxed">
               <span
                 data-i18n-project-text
                 data-es={project.introduccion?.textoEs ?? ''}
@@ -480,7 +480,7 @@ const optionalSections: Array<{
                   ) : (
                     <div class="project-img-placeholder flex items-center justify-center h-full">
                       <span
-                        class="font-inter text-[10px] uppercase tracking-widest text-neutral-600"
+                        class=" text-[10px] uppercase tracking-widest text-neutral-600"
                         data-i18n-project-text
                         data-es="Imagen no disponible"
                         data-en="Image unavailable"
@@ -521,10 +521,10 @@ const optionalSections: Array<{
 
       <!-- ── BLOQUES OPCIONALES ── -->
       {optionalSections.map((section) => (
-        <div class="project-gallery mt-10" id={section.key}>
-          <div class="mb-5">
+        <div class="project-gallery mt-40" id={section.key}>
+          <div class="mb-14">
             <h3
-              class=" text-neutral-500 uppercase tracking-widest mb-2"
+              class="text-2xl text-neutral-500 uppercase tracking-widest mb-2"
               data-i18n-project-text
               data-es={section.titleEs}
               data-en={section.titleEn}
@@ -532,7 +532,7 @@ const optionalSections: Array<{
               {section.title}
             </h3>
             {section.data?.texto && (
-              <p class="font-inter text-sm text-neutral-400 leading-relaxed">
+              <p class=" text-lg text-neutral-400 leading-relaxed">
                 <span
                   data-i18n-project-text
                   data-es={section.data.textoEs ?? ''}
@@ -579,7 +579,7 @@ const optionalSections: Array<{
                   ) : (
                     <div class="project-img-placeholder flex items-center justify-center h-full">
                       <span
-                        class="font-inter text-[10px] uppercase tracking-widest text-neutral-600"
+                        class=" text-[10px] uppercase tracking-widest text-neutral-600"
                         data-i18n-project-text
                         data-es="Imagen no disponible"
                         data-en="Image unavailable"
@@ -598,14 +598,14 @@ const optionalSections: Array<{
       {project.informacionRecalcable && (
         <div class="project-gallery mt-10">
           <p
-            class="font-inter text-xs text-neutral-500 uppercase tracking-widest mb-2"
+            class=" text-neutral-500 uppercase tracking-widest mb-2"
             data-i18n-project-text
             data-es={sectionTitles.informacionRecalcable.es}
             data-en={sectionTitles.informacionRecalcable.en}
           >
             {defaultLang === 'en' ? sectionTitles.informacionRecalcable.en : sectionTitles.informacionRecalcable.es}
           </p>
-          <p class="font-inter text-sm text-neutral-400 leading-relaxed">
+          <p class=" text-lg text-neutral-400 leading-relaxed">
             <span
               data-i18n-project-text
               data-es={project.informacionRecalcableEs ?? ''}
@@ -621,7 +621,7 @@ const optionalSections: Array<{
   ) : (
     <article class="project-entry">
       <p
-        class="font-inter text-sm text-neutral-400"
+        class=" text-lg text-neutral-400"
         data-i18n-project-text
         data-es="Proyecto no encontrado."
         data-en="Project not found."
