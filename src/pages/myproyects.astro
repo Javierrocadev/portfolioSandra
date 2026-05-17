@@ -55,7 +55,7 @@ type ProjectCard = {
   }
 }
 
-const defaultLang = DEFAULT_LANG;
+const defaultLang = DEFAULT_LANG as 'es' | 'en';
 
 const pickLocalized = (value: LocalizedText | undefined, lang: 'es' | 'en') => {
   if (!value) return '';
@@ -80,7 +80,7 @@ const getLocalizedLinks = (links: (ProjectLink | null)[] | undefined) =>
       const labelEn = link.label?.en ?? link.label?.es ?? 'View link';
 
       return {
-        label: defaultLang === 'en' ? labelEn : labelEs,
+        label: pickLocalized(link.label, defaultLang) || labelEs,
         labelEs,
         labelEn,
         url: link.url as string,
@@ -267,7 +267,7 @@ const pageDictionary = translations;
           {project.imagencover?.asset?.url ? (
             <img
               src={project.imagencover.asset.url}
-              alt={defaultLang === 'en' ? `Cover image of ${project.titulo}` : `Imagen de portada de ${project.titulo}`}
+              alt={`Imagen de portada de ${project.titulo}`}
               class="w-full h-full object-cover"
               loading="lazy"
             />
@@ -352,10 +352,9 @@ const pageDictionary = translations;
 
       projectTagsNodes.forEach((node) => {
         const localizedTags = parseLocalizedList(node, lang);
-        const tags = localizedTags.length > 0 ? localizedTags : "";
 
         node.innerHTML = '';
-        tags.forEach((tag) => {
+        localizedTags.forEach((tag: string) => {
           const tagNode = document.createElement('span');
           tagNode.className = 'chip';
           tagNode.textContent = tag;
