@@ -1,6 +1,7 @@
 ---
 import { sanityClient } from "../lib/sanity";
 import { DEFAULT_LANG, translations } from "../i18n/translations";
+import { urlFor } from "../lib/sanityImageUrl";
 
 type LocalizedText = {
   es?: string;
@@ -36,10 +37,30 @@ type SanityProject = {
   tags?: (ProjectTag | null)[];
   links?: (ProjectLink | null)[];
   slug?: { current?: string };
-  imagencover?: { asset?: { url?: string }; alt?: string };
+  imagencover?: {
+    alt?: string;
+    crop?: {
+      _type?: string;
+      top?: number;
+      bottom?: number;
+      left?: number;
+      right?: number;
+    };
+    hotspot?: {
+      _type?: string;
+      x?: number;
+      y?: number;
+      height?: number;
+      width?: number;
+    };
+    asset?: {
+      _ref?: string;
+      _type?: "reference";
+    };
+  };
 };
 
-const defaultLang = DEFAULT_LANG;
+const defaultLang: "es" | "en" = DEFAULT_LANG;
 
 const pickLocalized = (value: LocalizedText | undefined, lang: "es" | "en") => {
   if (!value) return "";
@@ -77,9 +98,10 @@ const proyects = await sanityClient.fetch<SanityProject[]>(`
   },
   slug,
   imagencover{
-    asset->{
-      url
-    }
+    alt,
+    crop,
+    hotspot,
+    asset
   },
 }
 `);
@@ -87,7 +109,9 @@ const proyects = await sanityClient.fetch<SanityProject[]>(`
 const projectImages: ProjectImage[] = proyects
   .flatMap((project) =>
     (project.imagencover ? [project.imagencover] : []).map((image) => ({
-      url: image?.asset?.url,
+      url: image?.asset?._ref
+        ? urlFor(image).width(800).format("webp").quality(80).url()
+        : "",
       alt: image?.alt,
       titulo: pickLocalized(project.titulo, defaultLang),
       tituloEs: pickLocalized(project.titulo, "es"),
@@ -108,21 +132,29 @@ const gridImages = Array.from(
 );
 
 const grid1Slots = [
-  { rowSpan: "row-span-7", baseColor: "bg-gray-300", image: gridImages[0] },
-  { rowSpan: "row-span-4", baseColor: "bg-gray-400", image: gridImages[1] },
-  { rowSpan: "row-span-5", baseColor: "bg-gray-500", image: gridImages[2] },
+  { baseColor: "bg-gray-300", image: gridImages[0] },
+  { baseColor: "bg-gray-400", image: gridImages[1] },
+  { baseColor: "bg-gray-500", image: gridImages[2] },
 ];
 
 const grid2Slots = [
-  { rowSpan: "row-span-5", baseColor: "bg-gray-300", image: gridImages[3] },
-  { rowSpan: "row-span-7", baseColor: "bg-gray-400", image: gridImages[4] },
-  { rowSpan: "row-span-5", baseColor: "", image: null, isExplore: true },
+  { baseColor: "bg-gray-300", image: gridImages[3] },
+  { baseColor: "bg-gray-400", image: gridImages[4] },
+  { baseColor: "", image: null, isExplore: true },
 ];
 
 const getProjectHref = (slug?: { current?: string }) =>
   slug?.current ? `/proyecto/${slug.current}` : "#";
 
 const projectsDictionary = translations;
+const fallbackProjectLabel = pickLocalized(
+  { es: "Proyecto", en: "Project" },
+  defaultLang,
+);
+const fallbackProjectImageAlt = pickLocalized(
+  { es: "Imagen de proyecto", en: "Project image" },
+  defaultLang,
+);
 ---
 
 <div
@@ -146,28 +178,22 @@ const projectsDictionary = translations;
     <!-- Grid -->
     <div class="flex gap-4 h-auto md:flex-row flex-col">
       <!-- GRID 1 -->
-      <div class="grid grid-rows-[repeat(16,minmax(0,1fr))] flex-1 gap-4">
+      <div class="flex flex-col flex-1 gap-4">
         {
           grid1Slots.map((slot) => (
-            <div
-              class={`${slot.baseColor} ${slot.rowSpan} relative overflow-hidden rounded-2xl`}
-            >
+            <div class={`${slot.baseColor} relative overflow-hidden rounded-2xl`}>
               {slot.image?.url && (
                 <a
                   href={getProjectHref(slot.image.slug)}
-                  class="h-full rounded-2xl overflow-hidden relative group duration-300 ease-in-out"
+                  class="rounded-2xl overflow-hidden relative group duration-300 ease-in-out block"
                 >
                   <img
                     loading="lazy"
                     src={slot.image.url}
                     alt={
-                      slot.image.alt ??
-                      slot.image.titulo ??
-                      (defaultLang === "en"
-                        ? "Project image"
-                        : "Imagen de proyecto")
+                      slot.image.alt ?? slot.image.titulo ?? fallbackProjectImageAlt
                     }
-                    class="w-full h-full object-cover min-h-64"
+                    class="w-full h-auto block"
                   />
 
                   <div class="absolute inset-0 bg-gradient-to-r from-black/92 via-black/60 to-black/20 opacity-30 transition-opacity duration-500 group-hover:opacity-100" />
@@ -180,7 +206,7 @@ const projectsDictionary = translations;
                     >
                       {(
                         slot.image.tags?.slice(0, 3) ?? [
-                          defaultLang === "en" ? "Project" : "Proyecto",
+                          fallbackProjectLabel,
                         ]
                       ).map((tag: string) => (
                         <span class="text-white/60 text-[11px] uppercase tracking-[2.5px]">
@@ -204,8 +230,7 @@ const projectsDictionary = translations;
                     data-es={slot.image.tituloEs ?? ""}
                     data-en={slot.image.tituloEn ?? ""}
                   >
-                    {slot.image.titulo ??
-                      (defaultLang === "en" ? "Project" : "Proyecto")}
+                    {slot.image.titulo ?? fallbackProjectLabel}
                   </h3>
                 </a>
               )}
@@ -215,12 +240,10 @@ const projectsDictionary = translations;
       </div>
 
       <!-- GRID 2 (cortes diferentes) -->
-      <div class="grid grid-rows-[repeat(16,minmax(0,1fr))] flex-1 gap-4">
+      <div class="flex flex-col flex-1 gap-4">
         {
           grid2Slots.map((slot) => (
-            <div
-              class={`${slot.baseColor} ${slot.rowSpan} relative overflow-hidden rounded-2xl`}
-            >
+            <div class={`${slot.baseColor} relative overflow-hidden rounded-2xl`}>
               {slot.isExplore && (
                 // <div class="h-full w-full flex flex-col items-start justify-between rounded-2xl border border-white/10 p-8">
                 //   <h3 class="text-white  text-4xl font-normal">
@@ -284,19 +307,15 @@ const projectsDictionary = translations;
               {slot.image?.url && (
                 <a
                   href={getProjectHref(slot.image.slug)}
-                  class="h-full rounded-2xl overflow-hidden relative group duration-300 ease-in-out"
+                  class="rounded-2xl overflow-hidden relative group duration-300 ease-in-out block"
                 >
                   <img
                     loading="lazy"
                     src={slot.image.url}
                     alt={
-                      slot.image.alt ??
-                      slot.image.titulo ??
-                      (defaultLang === "en"
-                        ? "Project image"
-                        : "Imagen de proyecto")
+                      slot.image.alt ?? slot.image.titulo ?? fallbackProjectImageAlt
                     }
-                    class="w-full h-full object-cover min-h-64"
+                    class="w-full h-auto block"
                   />
 
                   <div class="absolute inset-0 bg-gradient-to-r from-black/92 via-black/60 to-black/20 opacity-30 transition-opacity duration-500 group-hover:opacity-100" />
@@ -309,7 +328,7 @@ const projectsDictionary = translations;
                     >
                       {(
                         slot.image.tags?.slice(0, 3) ?? [
-                          defaultLang === "en" ? "Project" : "Proyecto",
+                          fallbackProjectLabel,
                         ]
                       ).map((tag: string) => (
                         <span class="text-white/60 text-[11px] uppercase tracking-[2.5px]">
@@ -333,8 +352,7 @@ const projectsDictionary = translations;
                     data-es={slot.image.tituloEs ?? ""}
                     data-en={slot.image.tituloEn ?? ""}
                   >
-                    {slot.image.titulo ??
-                      (defaultLang === "en" ? "Project" : "Proyecto")}
+                    {slot.image.titulo ?? fallbackProjectLabel}
                   </h3>
                 </a>
               )}

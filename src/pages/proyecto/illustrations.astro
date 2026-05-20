@@ -4,11 +4,27 @@ import "../../styles/global.css";
 import { sanityClient } from "../../lib/sanity";
 import Footer from "../../components/Footer.astro";
 import { DEFAULT_LANG } from "../../i18n/translations";
+import { urlFor } from "../../lib/sanityImageUrl";
 
 type SanityImage = {
   alt?: string;
+  crop?: {
+    _type?: string;
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  };
+  hotspot?: {
+    _type?: string;
+    x?: number;
+    y?: number;
+    height?: number;
+    width?: number;
+  };
   asset?: {
-    url?: string;
+    _ref?: string;
+    _type?: "reference";
   };
 };
 
@@ -28,9 +44,9 @@ const ilustracionesDocs = await sanityClient.fetch<IlustracionesDoc[]>(`
   tituloEn,
   imagenes[]{
     alt,
-    asset->{
-      url
-    }
+    crop,
+    hotspot,
+    asset
   }
 }
 `);
@@ -55,7 +71,7 @@ const ilustracionesConImagenes = ilustracionesDocs
       doc.titulo ?? doc.tituloEn ?? "seccion",
       doc._id,
     ),
-    imagenes: (doc.imagenes ?? []).filter((img) => Boolean(img?.asset?.url)),
+    imagenes: (doc.imagenes ?? []).filter((img) => Boolean(img?.asset?._ref)),
   }))
   .filter((doc) => (doc.imagenes?.length ?? 0) > 0);
 ---
@@ -103,7 +119,11 @@ const ilustracionesConImagenes = ilustracionesDocs
                   <div class="masonry-gallery-item">
                     <div class="masonry-gallery-item__content rounded-2xl overflow-hidden bg-[#191a1a]">
                       <img
-                        src={image.asset?.url}
+                        src={urlFor(image)
+                          .width(600)
+                          .format("webp")
+                          .quality(80)
+                          .url()}
                         alt={
                           image.alt ??
                           `${doc.titulo ?? "Ilustracion"} ${index + 1}`

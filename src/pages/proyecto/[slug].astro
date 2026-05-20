@@ -5,10 +5,27 @@ import { sanityClient } from '../../lib/sanity'
 import YouTube from "../../components/Youtube.astro";
 import Footer from '../../components/Footer.astro';
 import { DEFAULT_LANG, LANG_STORAGE_KEY } from '../../i18n/translations';
+import { urlFor } from "../../lib/sanityImageUrl";
 
 type SanityImage = {
+  alt?: string
+  crop?: {
+    _type?: string
+    top?: number
+    bottom?: number
+    left?: number
+    right?: number
+  }
+  hotspot?: {
+    _type?: string
+    x?: number
+    y?: number
+    height?: number
+    width?: number
+  }
   asset?: {
-    url?: string
+    _ref?: string
+    _type?: "reference"
   }
 }
 
@@ -196,8 +213,10 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
     },
 
     imagencover{
-      ...,
-      asset->
+    ...,
+    crop,
+    hotspot,
+    asset
     },
 
     links[]{
@@ -211,7 +230,9 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       texto{es,en},
       imagenes[]{
         ...,
-        asset->
+        crop,
+        hotspot,
+        asset
       }
     },
 
@@ -222,7 +243,9 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       },
       imagenes[]{
         ...,
-        asset->
+        crop,
+        hotspot,
+        asset
       }
     },
 
@@ -230,7 +253,9 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       texto{es,en},
       imagenes[]{
         ...,
-        asset->
+       crop,
+  hotspot,
+  asset
       }
     },
 
@@ -238,7 +263,9 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       texto{es,en},
       imagenes[]{
         ...,
-        asset->
+          crop,
+  hotspot,
+  asset
       }
     },
 
@@ -246,7 +273,9 @@ const projectRaw = await sanityClient.fetch<ProjectRaw | null>(
       texto{es,en},
       imagenes[]{
         ...,
-        asset->
+        crop,
+  hotspot,
+  asset
       }
     },
 
@@ -287,7 +316,10 @@ const project: ProjectMapped | null = projectRaw
     }
   : null;
 
-const imageUrl = (image?: SanityImage) => image?.asset?.url
+const imageUrl = (image?: SanityImage) =>
+  image?.asset?._ref
+    ? urlFor(image).width(1100).format("webp").quality(80).url()
+    : undefined;
 
 const sectionTitles = {
   tecnicas: { es: 'Tecnicas', en: 'Techniques' },

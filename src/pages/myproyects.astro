@@ -4,6 +4,7 @@ import "../styles/global.css";
 import { sanityClient } from '../lib/sanity'
 import Footer from '../components/Footer.astro';
 import { DEFAULT_LANG, translations } from '../i18n/translations';
+import { urlFor } from "../lib/sanityImageUrl";
 
 type LocalizedText = {
   es?: string
@@ -23,8 +24,24 @@ type SanityProject = {
   titulo?: LocalizedText
   descripcioncorta?: LocalizedText
   imagencover?: {
+    alt?: string
+    crop?: {
+      _type?: string
+      top?: number
+      bottom?: number
+      left?: number
+      right?: number
+    }
+    hotspot?: {
+      _type?: string
+      x?: number
+      y?: number
+      height?: number
+      width?: number
+    }
     asset?: {
-      url?: string
+      _ref?: string
+      _type?: "reference"
     }
   }
   tags?: (ProjectTag | null)[]
@@ -41,11 +58,8 @@ type ProjectCard = {
   descripcion: string
   descripcionEs: string
   descripcionEn: string
-  imagencover?: {
-    asset?: {
-      url?: string
-    }
-  }
+  imagencoverUrl?: string
+  imagencoverAlt?: string
   tags: string[]
   tagsEs: string[]
   tagsEn: string[]
@@ -92,9 +106,10 @@ const projectsRaw = await sanityClient.fetch<SanityProject[]>(`
   titulo{es,en},
   descripcioncorta{es,en},
   imagencover{
-    asset->{
-      url
-    }
+    alt,
+    crop,
+    hotspot,
+    asset
   },
   tags[]->{
     label{es,en}
@@ -113,6 +128,16 @@ const projects: ProjectCard[] = projectsRaw.map((project) => {
   const descripcionEs = pickLocalized(project.descripcioncorta, 'es');
   const descripcionEn = pickLocalized(project.descripcioncorta, 'en');
 
+  let imagencoverUrl = "";
+  let imagencoverAlt = project.imagencover?.alt ?? tituloEs ?? "Imagen de proyecto";
+  if (project.imagencover?.asset?._ref) {
+    imagencoverUrl = urlFor(project.imagencover)
+      .width(800)
+      .format("webp")
+      .quality(80)
+      .url();
+  }
+
   return {
     titulo: pickLocalized(project.titulo, defaultLang),
     tituloEs,
@@ -120,7 +145,8 @@ const projects: ProjectCard[] = projectsRaw.map((project) => {
     descripcion: pickLocalized(project.descripcioncorta, defaultLang),
     descripcionEs,
     descripcionEn,
-    imagencover: project.imagencover,
+    imagencoverUrl,
+    imagencoverAlt,
     tags: getLocalizedTags(project.tags, defaultLang),
     tagsEs: getLocalizedTags(project.tags, 'es'),
     tagsEn: getLocalizedTags(project.tags, 'en'),
@@ -264,10 +290,10 @@ const pageDictionary = translations;
     href={`/proyecto/${project.slug?.current}`}
         class="project-img-wrap rounded-2xl overflow-hidden bg-[#191a1a]
                     aspect-4/3 lg:aspect-auto lg:min-h-70">
-          {project.imagencover?.asset?.url ? (
+          {project.imagencoverUrl ? (
             <img
-              src={project.imagencover.asset.url}
-              alt={`Imagen de portada de ${project.titulo}`}
+              src={project.imagencoverUrl}
+              alt={project.imagencoverAlt}
               class="w-full h-full object-cover"
               loading="lazy"
             />

@@ -1,11 +1,27 @@
 ---
 import { sanityClient } from "../lib/sanity";
 import { DEFAULT_LANG, translations } from "../i18n/translations";
+import { urlFor } from "../lib/sanityImageUrl";
 
 type GalleryImage = {
   alt?: string;
+  crop?: {
+    _type?: string;
+    top?: number;
+    bottom?: number;
+    left?: number;
+    right?: number;
+  };
+  hotspot?: {
+    _type?: string;
+    x?: number;
+    y?: number;
+    height?: number;
+    width?: number;
+  };
   asset?: {
-    url?: string;
+    _ref?: string;
+    _type?: "reference";
   };
 };
 
@@ -32,9 +48,9 @@ const [illustrationsRaw, photographsRaw] = await Promise.all([
       tituloEn,
       imagenes[]{
         alt,
-        asset->{
-          url
-        }
+        crop,
+        hotspot,
+        asset
       }
     }
   `),
@@ -45,9 +61,9 @@ const [illustrationsRaw, photographsRaw] = await Promise.all([
       tituloEn,
       imagenes[]{
         alt,
-        asset->{
-          url
-        }
+        crop,
+        hotspot,
+        asset
       }
     }
   `),
@@ -84,7 +100,7 @@ const mapGalleryToSliderItems = (
 ): SliderItem[] => {
   const groupedItems = galleries.flatMap((gallery) => {
     const validImages = (gallery.imagenes ?? []).filter((image) =>
-      Boolean(image?.asset?.url),
+      Boolean(image?.asset?._ref),
     );
 
     const randomImages = shuffleItems(validImages).slice(0, 3);
@@ -93,7 +109,9 @@ const mapGalleryToSliderItems = (
     const sectionId = createSectionId(gallery.titulo ?? tituloEn, gallery._id);
 
     return randomImages.map((image) => ({
-      url: image.asset?.url ?? "",
+      url: image?.asset?._ref
+        ? urlFor(image).width(800).format("webp").quality(80).url()
+        : "",
       alt: image.alt ?? tituloEs,
       tituloEs,
       tituloEn,

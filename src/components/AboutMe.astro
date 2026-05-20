@@ -1,6 +1,11 @@
 ---
 import { sanityClient } from "../lib/sanity";
-import { DEFAULT_LANG, LANG_STORAGE_KEY, translations } from "../i18n/translations";
+import {
+  DEFAULT_LANG,
+  LANG_STORAGE_KEY,
+  translations,
+} from "../i18n/translations";
+import { urlFor } from "../lib/sanityImageUrl";
 
 type PerfilProgram = {
   nombre?: string;
@@ -26,8 +31,23 @@ type Perfil = {
     };
   };
   avatar?: {
+    crop?: {
+      _type?: string;
+      top?: number;
+      bottom?: number;
+      left?: number;
+      right?: number;
+    };
+    hotspot?: {
+      _type?: string;
+      x?: number;
+      y?: number;
+      height?: number;
+      width?: number;
+    };
     asset?: {
-      url?: string;
+      _ref?: string;
+      _type?: "reference";
     };
   };
   programas?: PerfilProgram[];
@@ -53,9 +73,9 @@ const perfil = await sanityClient.fetch<Perfil | null>(`
       en
     },
     avatar{
-      asset->{
-        url
-      }
+      crop,
+      hotspot,
+      asset
     },
     programas[]{
       nombre,
@@ -68,7 +88,9 @@ const cvUrl = perfil?.cv?.asset?.url;
 const cvFilename = perfil?.cv?.asset?.originalFilename ?? "cv.pdf";
 const cvEnUrl = perfil?.cvEn?.asset?.url;
 const cvEnFilename = perfil?.cvEn?.asset?.originalFilename ?? "cv-en.pdf";
-const avatarUrl = perfil?.avatar?.asset?.url;
+const avatarUrl = perfil?.avatar?.asset?._ref
+  ? urlFor(perfil.avatar).width(500).format("webp").quality(80).url()
+  : null;
 const profileName = perfil?.nombre ?? "Sandra Guillen Marcos";
 
 const programs = (perfil?.programas ?? []).map((program) => ({
@@ -81,14 +103,19 @@ const aboutParagraphsEs = (perfil?.descripcion?.es ?? "")
   .map((line) => line.trim())
   .filter(Boolean);
 
-const aboutParagraphsEn = (perfil?.descripcion?.en ?? perfil?.descripcion?.es ?? "")
+const aboutParagraphsEn = (
+  perfil?.descripcion?.en ??
+  perfil?.descripcion?.es ??
+  ""
+)
   .split("\n")
   .map((line) => line.trim())
   .filter(Boolean);
 
 const defaultLang = DEFAULT_LANG;
 const aboutDictionary = translations;
-const aboutParagraphs = defaultLang === "en" ? aboutParagraphsEn : aboutParagraphsEs;
+const aboutParagraphs =
+  defaultLang === "en" ? aboutParagraphsEn : aboutParagraphsEs;
 
 const MAX_STARS = 5;
 ---
@@ -106,15 +133,15 @@ const MAX_STARS = 5;
     </div>
 
     <!-- ── Display headline ── -->
-    <h2 class="about-headline" >
-      Sandra Guillén Marcos
-    </h2>
+    <h2 class="about-headline">Sandra Guillén Marcos</h2>
 
     <!-- ── Two-column body ── -->
     <div class="about-grid">
       <!-- LEFT: Bio -->
       <div class="about-bio">
-        <h3 class="about-bio__title" data-i18n-about="aboutMe">{aboutDictionary[defaultLang].general.aboutMe}</h3>
+        <h3 class="about-bio__title" data-i18n-about="aboutMe">
+          {aboutDictionary[defaultLang].general.aboutMe}
+        </h3>
 
         <div
           id="about-bio-text"
@@ -136,40 +163,37 @@ const MAX_STARS = 5;
         <div class="about-cv-actions">
           {
             cvUrl ? (
-             
-                  <a
-      href={cvUrl}
+              <a
+                href={cvUrl}
                 download={cvFilename}
                 target="_blank"
                 rel="noopener noreferrer"
-      class="group flex items-center gap-3 px-6 py-3.5 rounded-full
+                class="group flex items-center gap-3 px-6 py-3.5 rounded-full
              bg-[#1f2020] border border-white/10
              font-inter text-sm text-neutral-300
              transition-all duration-300 hover:border-white/25 hover:bg-[#252626] hover:text-white"
-       data-i18n-about="downloadCV"
-    >
-       {aboutDictionary[defaultLang].general.downloadCV}
-   
-    </a>
+                data-i18n-about="downloadCV"
+              >
+                {aboutDictionary[defaultLang].general.downloadCV}
+              </a>
             ) : null
           }
 
           {
             cvEnUrl ? (
               <a
-     href={cvEnUrl}
+                href={cvEnUrl}
                 download={cvEnFilename}
                 target="_blank"
                 rel="noopener noreferrer"
-      class="group flex items-center gap-3 px-6 py-3.5 rounded-full
+                class="group flex items-center gap-3 px-6 py-3.5 rounded-full
              bg-[#1f2020] border border-white/10
              font-inter text-sm text-neutral-300
              transition-all duration-300 hover:border-white/25 hover:bg-[#252626] hover:text-white"
-       data-i18n-about="downloadCVEn"
-    >
-       {aboutDictionary[defaultLang].general.downloadCVEn}
-   
-    </a>
+                data-i18n-about="downloadCVEn"
+              >
+                {aboutDictionary[defaultLang].general.downloadCVEn}
+              </a>
             ) : null
           }
         </div>
@@ -265,7 +289,10 @@ const MAX_STARS = 5;
       return value === "en" ? "en" : "es";
     }
 
-    function renderBioParagraphs(lang: "es" | "en", dictionary: typeof ABOUT_I18N.es) {
+    function renderBioParagraphs(
+      lang: "es" | "en",
+      dictionary: typeof ABOUT_I18N.es,
+    ) {
       if (!bioNode) return;
 
       const raw = bioNode.getAttribute(`data-${lang}`) ?? "[]";
@@ -274,7 +301,9 @@ const MAX_STARS = 5;
       try {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          paragraphs = parsed.filter((item): item is string => typeof item === "string");
+          paragraphs = parsed.filter(
+            (item): item is string => typeof item === "string",
+          );
         }
       } catch {
         paragraphs = [];
@@ -300,7 +329,9 @@ const MAX_STARS = 5;
       const dictionary = ABOUT_I18N[lang];
 
       i18nNodes.forEach((node) => {
-        const key = node.dataset.i18nAbout as keyof typeof dictionary | undefined;
+        const key = node.dataset.i18nAbout as
+          | keyof typeof dictionary
+          | undefined;
         if (!key) return;
         node.textContent = dictionary[key];
       });
